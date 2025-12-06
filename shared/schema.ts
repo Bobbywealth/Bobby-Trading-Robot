@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, numeric, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -9,10 +9,112 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export const strategies = pgTable("strategies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+  parameters: jsonb("parameters"),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertStrategySchema = createInsertSchema(strategies).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStrategy = z.infer<typeof insertStrategySchema>;
+export type Strategy = typeof strategies.$inferSelect;
+
+export const riskConfigs = pgTable("risk_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  maxDailyLossDollar: numeric("max_daily_loss_dollar"),
+  maxDailyLossPercent: numeric("max_daily_loss_percent"),
+  maxPositionSize: integer("max_position_size"),
+  maxLotSize: numeric("max_lot_size"),
+  tradingHoursStart: text("trading_hours_start"),
+  tradingHoursEnd: text("trading_hours_end"),
+  newsFilterEnabled: boolean("news_filter_enabled").default(false),
+  assetBlacklist: text("asset_blacklist").array(),
+});
+
+export const insertRiskConfigSchema = createInsertSchema(riskConfigs).omit({
+  id: true,
+});
+
+export type InsertRiskConfig = z.infer<typeof insertRiskConfigSchema>;
+export type RiskConfig = typeof riskConfigs.$inferSelect;
+
+export const trades = pgTable("trades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  strategyId: varchar("strategy_id").references(() => strategies.id),
+  orderId: text("order_id"),
+  symbol: text("symbol").notNull(),
+  side: text("side").notNull(),
+  entryPrice: numeric("entry_price").notNull(),
+  exitPrice: numeric("exit_price"),
+  quantity: numeric("quantity").notNull(),
+  entryTime: timestamp("entry_time").notNull().default(sql`now()`),
+  exitTime: timestamp("exit_time"),
+  pnl: numeric("pnl"),
+  status: text("status").notNull().default('OPEN'),
+});
+
+export const insertTradeSchema = createInsertSchema(trades).omit({
+  id: true,
+  entryTime: true,
+});
+
+export type InsertTrade = z.infer<typeof insertTradeSchema>;
+export type Trade = typeof trades.$inferSelect;
+
+export const systemLogs = pgTable("system_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  level: text("level").notNull(),
+  module: text("module").notNull(),
+  message: text("message").notNull(),
+  timestamp: timestamp("timestamp").notNull().default(sql`now()`),
+});
+
+export const insertSystemLogSchema = createInsertSchema(systemLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertSystemLog = z.infer<typeof insertSystemLogSchema>;
+export type SystemLog = typeof systemLogs.$inferSelect;
+
+export const backtestResults = pgTable("backtest_results", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  strategyId: varchar("strategy_id").notNull().references(() => strategies.id),
+  symbol: text("symbol").notNull(),
+  timeframe: text("timeframe").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  totalTrades: integer("total_trades").notNull(),
+  winRate: numeric("win_rate").notNull(),
+  totalPnl: numeric("total_pnl").notNull(),
+  maxDrawdown: numeric("max_drawdown").notNull(),
+  sharpeRatio: numeric("sharpe_ratio"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertBacktestResultSchema = createInsertSchema(backtestResults).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBacktestResult = z.infer<typeof insertBacktestResultSchema>;
+export type BacktestResult = typeof backtestResults.$inferSelect;
