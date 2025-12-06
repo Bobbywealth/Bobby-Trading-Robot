@@ -7,10 +7,96 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Play, Save, RotateCcw, Code, Zap, Layers } from "lucide-react";
+import { Play, Save, RotateCcw, Code, Zap, Layers, BookOpen } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const TEMPLATES = {
+  ema_crossover: `def on_tick(data, account):
+    # EMA Crossover Strategy
+    # A simple trend-following strategy using two Exponential Moving Averages
+    
+    fast_period = 9
+    slow_period = 21
+    
+    ema_fast = indicators.ema(data.close, fast_period)
+    ema_slow = indicators.ema(data.close, slow_period)
+    
+    current_price = data.close[-1]
+    
+    # Check for crossover
+    if ema_fast[-1] > ema_slow[-1] and ema_fast[-2] <= ema_slow[-2]:
+        if not position.is_open:
+            trade.buy(
+                symbol=data.symbol,
+                volume=0.1,
+                sl=current_price - 20 * data.point,
+                tp=current_price + 40 * data.point
+            )
+            log.info(f"Bullish Crossover: Bought {data.symbol}")
+            
+    elif ema_fast[-1] < ema_slow[-1] and ema_fast[-2] >= ema_slow[-2]:
+        if position.is_long:
+            trade.close_all()
+            log.info("Bearish Crossover: Closed Longs")`,
+            
+  rsi_reversal: `def on_tick(data, account):
+    # RSI Mean Reversal
+    # Buys when oversold (<30) and Sells when overbought (>70)
+    
+    rsi_period = 14
+    rsi_val = indicators.rsi(data.close, rsi_period)
+    current_rsi = rsi_val[-1]
+    current_price = data.close[-1]
+    
+    if current_rsi < 30 and not position.is_open:
+        # Oversold condition
+        trade.buy(
+            symbol=data.symbol,
+            volume=0.1,
+            sl=current_price * 0.99, # 1% Stop Loss
+            tp=current_price * 1.02  # 2% Take Profit
+        )
+        log.info(f"RSI Oversold ({current_rsi:.1f}): Buy Signal")
+        
+    elif current_rsi > 70 and position.is_long:
+        # Overbought condition
+        trade.close_all()
+        log.info(f"RSI Overbought ({current_rsi:.1f}): Closing Positions")`,
+        
+  bollinger_breakout: `def on_tick(data, account):
+    # Bollinger Bands Breakout
+    # Trades when price breaks outside the volatility bands
+    
+    period = 20
+    std_dev = 2.0
+    
+    upper, middle, lower = indicators.bbands(data.close, period, std_dev)
+    current_price = data.close[-1]
+    
+    # Expansion logic: Bandwidth increasing
+    bandwidth = (upper[-1] - lower[-1]) / middle[-1]
+    
+    if current_price > upper[-1] and bandwidth > 0.002:
+        if not position.is_open:
+            trade.buy(symbol=data.symbol, volume=0.1)
+            log.info("Upper BB Breakout: Long Entry")
+            
+    elif current_price < middle[-1] and position.is_long:
+        # Close when price returns to mean
+        trade.close_all()
+        log.info("Price returned to mean: Exit")`
+};
 
 export function StrategyEditor() {
   const [strategyType, setStrategyType] = useState("custom");
+  const [code, setCode] = useState(TEMPLATES.ema_crossover);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
@@ -112,9 +198,37 @@ export function StrategyEditor() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-2">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  Load Template
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>Strategy Library</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setCode(TEMPLATES.ema_crossover); setStrategyType("custom"); }}>
+                  EMA Crossover (Trend)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setCode(TEMPLATES.rsi_reversal); setStrategyType("custom"); }}>
+                  RSI Mean Reversion
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setCode(TEMPLATES.bollinger_breakout); setStrategyType("custom"); }}>
+                  Bollinger Breakout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+          
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="h-7 text-muted-foreground hover:text-foreground">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 text-muted-foreground hover:text-foreground"
+              onClick={() => setCode(TEMPLATES.ema_crossover)}
+            >
               <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reset
             </Button>
             <Button size="sm" className="h-7 bg-primary text-primary-foreground hover:bg-primary/90">
@@ -130,27 +244,8 @@ export function StrategyEditor() {
           <Textarea 
             className="w-full h-full pl-10 bg-transparent border-none resize-none focus-visible:ring-0 text-blue-300 leading-6 font-mono"
             spellCheck={false}
-            defaultValue={`def on_tick(data, account):
-    # Trading Logic
-    ema_fast = indicators.ema(data.close, 9)
-    ema_slow = indicators.ema(data.close, 21)
-    
-    current_price = data.close[-1]
-    
-    if ema_fast[-1] > ema_slow[-1] and not position.is_open:
-        # Bullish Crossover
-        trade.buy(
-            symbol="XAUUSD",
-            volume=0.1,
-            sl=current_price - 2.50,
-            tp=current_price + 5.00
-        )
-        log.info("Buy Signal Executed")
-        
-    elif ema_fast[-1] < ema_slow[-1] and position.is_long:
-        # Bearish Crossover - Close Longs
-        trade.close_all()
-        log.info("Closing Long Positions")`}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
           />
         </div>
         
