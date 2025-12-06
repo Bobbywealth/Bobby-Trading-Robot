@@ -9,6 +9,7 @@ import StrategyPage from "@/pages/StrategyPage";
 import LogsPage from "@/pages/LogsPage";
 import RiskPage from "@/pages/RiskPage";
 import SettingsPage from "@/pages/SettingsPage";
+import ConnectPage from "@/pages/ConnectPage";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/logs" component={LogsPage} />
       <Route path="/risk" component={RiskPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/connect" component={ConnectPage} />
       <Route component={NotFound} />
     </Switch>
   );

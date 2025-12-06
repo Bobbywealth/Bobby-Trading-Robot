@@ -118,3 +118,24 @@ export const insertBacktestResultSchema = createInsertSchema(backtestResults).om
 
 export type InsertBacktestResult = z.infer<typeof insertBacktestResultSchema>;
 export type BacktestResult = typeof backtestResults.$inferSelect;
+
+export const brokerCredentials = pgTable("broker_credentials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  broker: text("broker").notNull().default("tradelocker"),
+  email: text("email").notNull(),
+  server: text("server").notNull(),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  accountId: text("account_id"),
+  accountNumber: text("account_number"),
+  isConnected: boolean("is_connected").default(false),
+  lastConnected: timestamp("last_connected"),
+});
+
+export const insertBrokerCredentialSchema = createInsertSchema(brokerCredentials).omit({
+  id: true,
+});
+
+export type InsertBrokerCredential = z.infer<typeof insertBrokerCredentialSchema>;
+export type BrokerCredential = typeof brokerCredentials.$inferSelect;

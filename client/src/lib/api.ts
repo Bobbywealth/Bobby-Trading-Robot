@@ -174,3 +174,99 @@ export function useCreateBacktestResult() {
     },
   });
 }
+
+// ============================================================================
+// BROKER CONNECTION
+// ============================================================================
+
+interface BrokerStatus {
+  connected: boolean;
+  broker?: string;
+  email?: string;
+  server?: string;
+  accountNumber?: string;
+  lastConnected?: string;
+}
+
+interface BrokerAccount {
+  id: number;
+  name: string;
+  accNum: number;
+  currency: string;
+  balance: number;
+  equity: number;
+}
+
+interface ConnectResponse {
+  success: boolean;
+  accounts: BrokerAccount[];
+}
+
+export function useBrokerStatus() {
+  return useQuery<BrokerStatus>({
+    queryKey: ["/api/broker/status"],
+    refetchInterval: 30000,
+  });
+}
+
+export function useConnectBroker() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { email: string; password: string; server: string }) => {
+      const res = await apiRequest("POST", "/api/broker/connect", data);
+      return res.json() as Promise<ConnectResponse>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+    },
+  });
+}
+
+export function useSelectBrokerAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { accountId: string; accountNumber: number }) => {
+      const res = await apiRequest("POST", "/api/broker/select-account", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+    },
+  });
+}
+
+export function useDisconnectBroker() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/broker/disconnect");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+    },
+  });
+}
+
+export function useBrokerAccounts() {
+  return useQuery<BrokerAccount[]>({
+    queryKey: ["/api/broker/accounts"],
+    enabled: false,
+  });
+}
+
+export function useBrokerQuotes(symbols: string[]) {
+  const symbolsParam = symbols.join(",");
+  return useQuery<Array<{ s: string; bid: number; ask: number; timestamp: number }>>({
+    queryKey: [`/api/broker/quotes?symbols=${symbolsParam}`],
+    enabled: symbols.length > 0,
+    refetchInterval: 1000,
+  });
+}
+
+export function useBrokerPositions() {
+  return useQuery<any[]>({
+    queryKey: ["/api/broker/positions"],
+    refetchInterval: 5000,
+  });
+}

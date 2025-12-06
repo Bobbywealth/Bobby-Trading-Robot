@@ -1,13 +1,16 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { createTradeLockerService, getTradeLockerService, clearTradeLockerService, initializeTradeLockerService } from "./tradelocker";
 import {
   insertStrategySchema,
   insertRiskConfigSchema,
   insertTradeSchema,
   insertSystemLogSchema,
   insertBacktestResultSchema,
+  insertBrokerCredentialSchema,
 } from "@shared/schema";
+import { z } from "zod";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -172,6 +175,260 @@ export async function registerRoutes(
         userId: MOCK_USER_ID,
       });
       const result = await storage.createBacktestResult(validatedData);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  const connectBrokerSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(1),
+    server: z.string().min(1),
+  });
+
+  app.post("/api/broker/connect", async (req, res) => {
+    try {
+      const { email, password, server } = connectBrokerSchema.parse(req.body);
+      
+      clearTradeLockerService(MOCK_USER_ID);
+      
+      const tradeLocker = createTradeLockerService(server);
+      const authResult = await tradeLocker.authenticate(email, password, server);
+      
+      const accounts = await tradeLocker.getAccounts();
+      
+      await storage.upsertBrokerCredential({
+        userId: MOCK_USER_ID,
+        broker: "tradelocker",
+        email,
+        server,
+        accessToken: authResult.accessToken,
+        refreshToken: authResult.refreshToken,
+        accountId: null,
+        accountNumber: null,
+        isConnected: true,
+        lastConnected: new Date(),
+      });
+
+      res.json({
+        success: true,
+        accounts: accounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          accNum: a.accNum,
+          currency: a.currency,
+          balance: a.accountBalance,
+          equity: a.accountEquity,
+        })),
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/broker/select-account", async (req, res) => {
+    try {
+      const { accountId, accountNumber } = z
+        .object({
+          accountId: z.string(),
+          accountNumber: z.number(),
+        })
+        .parse(req.body);
+
+      const credential = await storage.getBrokerCredential(MOCK_USER_ID);
+      if (!credential || !credential.accessToken) {
+        return res.status(401).json({ error: "Not connected to broker" });
+      }
+
+      await storage.updateBrokerCredential(MOCK_USER_ID, {
+        accountId,
+        accountNumber: String(accountNumber),
+      });
+
+      initializeTradeLockerService(
+        MOCK_USER_ID,
+        credential.server,
+        credential.accessToken,
+        credential.refreshToken!,
+        accountNumber
+      );
+
+      res.json({ success: true, accountNumber });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/broker/status", async (req, res) => {
+    try {
+      const credential = await storage.getBrokerCredential(MOCK_USER_ID);
+      
+      if (!credential) {
+        return res.json({ connected: false });
+      }
+
+      res.json({
+        connected: credential.isConnected,
+        broker: credential.broker,
+        email: credential.email,
+        server: credential.server,
+        accountNumber: credential.accountNumber,
+        lastConnected: credential.lastConnected,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/broker/disconnect", async (req, res) => {
+    try {
+      clearTradeLockerService(MOCK_USER_ID);
+      await storage.deleteBrokerCredential(MOCK_USER_ID);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/broker/accounts", async (req, res) => {
+    try {
+      const credential = await storage.getBrokerCredential(MOCK_USER_ID);
+      if (!credential || !credential.accessToken) {
+        return res.status(401).json({ error: "Not connected to broker" });
+      }
+
+      const tradeLocker = initializeTradeLockerService(
+        MOCK_USER_ID,
+        credential.server,
+        credential.accessToken,
+        credential.refreshToken!
+      );
+
+      const accounts = await tradeLocker.getAccounts();
+      res.json(
+        accounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          accNum: a.accNum,
+          currency: a.currency,
+          balance: a.accountBalance,
+          equity: a.accountEquity,
+        }))
+      );
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/broker/instruments", async (req, res) => {
+    try {
+      const credential = await storage.getBrokerCredential(MOCK_USER_ID);
+      if (!credential || !credential.accessToken) {
+        return res.status(401).json({ error: "Not connected to broker" });
+      }
+      if (!credential.accountNumber) {
+        return res.status(409).json({ error: "No account selected. Please select an account first." });
+      }
+
+      const tradeLocker = initializeTradeLockerService(
+        MOCK_USER_ID,
+        credential.server,
+        credential.accessToken,
+        credential.refreshToken!,
+        parseInt(credential.accountNumber)
+      );
+
+      const instruments = await tradeLocker.getInstruments();
+      res.json(instruments);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/broker/quotes", async (req, res) => {
+    try {
+      const symbols = (req.query.symbols as string)?.split(",") || ["EURUSD"];
+      
+      const credential = await storage.getBrokerCredential(MOCK_USER_ID);
+      if (!credential || !credential.accessToken) {
+        return res.status(401).json({ error: "Not connected to broker" });
+      }
+      if (!credential.accountNumber) {
+        return res.status(409).json({ error: "No account selected. Please select an account first." });
+      }
+
+      const tradeLocker = initializeTradeLockerService(
+        MOCK_USER_ID,
+        credential.server,
+        credential.accessToken,
+        credential.refreshToken!,
+        parseInt(credential.accountNumber)
+      );
+
+      const quotes = await tradeLocker.getQuotes(symbols);
+      res.json(quotes);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/broker/positions", async (req, res) => {
+    try {
+      const credential = await storage.getBrokerCredential(MOCK_USER_ID);
+      if (!credential || !credential.accessToken) {
+        return res.status(401).json({ error: "Not connected to broker" });
+      }
+      if (!credential.accountNumber) {
+        return res.status(409).json({ error: "No account selected. Please select an account first." });
+      }
+
+      const tradeLocker = initializeTradeLockerService(
+        MOCK_USER_ID,
+        credential.server,
+        credential.accessToken,
+        credential.refreshToken!,
+        parseInt(credential.accountNumber)
+      );
+
+      const positions = await tradeLocker.getOpenPositions();
+      res.json(positions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  const placeOrderSchema = z.object({
+    instrumentId: z.number(),
+    qty: z.number().positive(),
+    side: z.enum(["buy", "sell"]),
+    type: z.enum(["market", "limit", "stop"]),
+    price: z.number().optional(),
+    stopLoss: z.number().optional(),
+    takeProfit: z.number().optional(),
+  });
+
+  app.post("/api/broker/orders", async (req, res) => {
+    try {
+      const orderData = placeOrderSchema.parse(req.body);
+      
+      const credential = await storage.getBrokerCredential(MOCK_USER_ID);
+      if (!credential || !credential.accessToken) {
+        return res.status(401).json({ error: "Not connected to broker" });
+      }
+      if (!credential.accountNumber) {
+        return res.status(409).json({ error: "No account selected. Please select an account first." });
+      }
+
+      const tradeLocker = initializeTradeLockerService(
+        MOCK_USER_ID,
+        credential.server,
+        credential.accessToken,
+        credential.refreshToken!,
+        parseInt(credential.accountNumber)
+      );
+
+      const result = await tradeLocker.placeOrder(orderData);
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

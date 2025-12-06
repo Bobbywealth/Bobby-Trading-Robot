@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, EyeOff, Maximize2 } from "lucide-react";
+import { Eye, EyeOff, Maximize2, Wifi, WifiOff } from "lucide-react";
+import { useBrokerStatus, useBrokerQuotes } from "@/lib/api";
 
 // Generate realistic candlestick data
 const generateData = (count: number) => {
@@ -50,6 +51,12 @@ export function MarketChart() {
   const [candleSeries, setCandleSeries] = useState<ISeriesApi<"Candlestick"> | null>(null);
   const [fastEmaSeries, setFastEmaSeries] = useState<ISeriesApi<"Line"> | null>(null);
   const [slowEmaSeries, setSlowEmaSeries] = useState<ISeriesApi<"Line"> | null>(null);
+  
+  const { data: brokerStatus } = useBrokerStatus();
+  const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
+  
+  const { data: liveQuotes } = useBrokerQuotes(isConnected ? ["XAUUSD"] : []);
+  const livePrice = liveQuotes?.[0];
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -147,13 +154,13 @@ export function MarketChart() {
       }
     }
     
-    // Safely set markers
-    if (candles && typeof candles.setMarkers === 'function') {
-        try {
-            candles.setMarkers(markers as any[]);
-        } catch (e) {
-            console.error("Failed to set markers", e);
-        }
+    // Safely set markers (markers API available on chart, not series in newer versions)
+    try {
+      if (markers.length > 0) {
+        (candles as any).setMarkers?.(markers);
+      }
+    } catch (e) {
+      // Markers not supported in this version
     }
 
     // Cleanup
@@ -170,16 +177,39 @@ export function MarketChart() {
     }
   }, [showStrategy, fastEmaSeries, slowEmaSeries]);
 
+  const displayPrice = livePrice ? ((livePrice.bid + livePrice.ask) / 2).toFixed(2) : "2,042.58";
+  
   return (
     <Card className="h-full border-border/50 bg-card/30 backdrop-blur-sm overflow-hidden flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2 shrink-0 border-b border-border/20 bg-card/50">
         <div className="space-y-1">
           <CardTitle className="font-display text-lg flex items-center gap-2">
             XAUUSD <span className="text-muted-foreground font-sans text-sm font-normal">Gold vs US Dollar</span>
+            {isConnected ? (
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs ml-2">
+                <Wifi className="w-3 h-3 mr-1" />
+                LIVE
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="bg-muted text-muted-foreground border-muted text-xs ml-2">
+                <WifiOff className="w-3 h-3 mr-1" />
+                DEMO
+              </Badge>
+            )}
           </CardTitle>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-mono font-bold text-foreground">2,042.58</span>
+              <span className="text-2xl font-mono font-bold text-foreground" data-testid="text-price">
+                {displayPrice}
+              </span>
+              {livePrice && (
+                <div className="flex gap-1 text-xs font-mono">
+                  <span className="text-muted-foreground">B:</span>
+                  <span className="text-primary">{livePrice.bid.toFixed(2)}</span>
+                  <span className="text-muted-foreground ml-1">A:</span>
+                  <span className="text-destructive">{livePrice.ask.toFixed(2)}</span>
+                </div>
+              )}
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-mono">
                 +0.45%
               </Badge>

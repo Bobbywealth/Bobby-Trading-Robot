@@ -7,6 +7,7 @@ import {
   trades,
   systemLogs,
   backtestResults,
+  brokerCredentials,
   type User,
   type InsertUser,
   type Strategy,
@@ -19,6 +20,8 @@ import {
   type InsertSystemLog,
   type BacktestResult,
   type InsertBacktestResult,
+  type BrokerCredential,
+  type InsertBrokerCredential,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -44,6 +47,11 @@ export interface IStorage {
 
   getBacktestResults(userId: string, strategyId?: string): Promise<BacktestResult[]>;
   createBacktestResult(result: InsertBacktestResult): Promise<BacktestResult>;
+
+  getBrokerCredential(userId: string): Promise<BrokerCredential | undefined>;
+  upsertBrokerCredential(credential: InsertBrokerCredential): Promise<BrokerCredential>;
+  updateBrokerCredential(userId: string, updates: Partial<InsertBrokerCredential>): Promise<BrokerCredential | undefined>;
+  deleteBrokerCredential(userId: string): Promise<boolean>;
 }
 
 export class PostgreSQLStorage implements IStorage {
@@ -145,6 +153,33 @@ export class PostgreSQLStorage implements IStorage {
   async createBacktestResult(result: InsertBacktestResult): Promise<BacktestResult> {
     const dbResult = await db.insert(backtestResults).values(result).returning();
     return dbResult[0];
+  }
+
+  async getBrokerCredential(userId: string): Promise<BrokerCredential | undefined> {
+    const result = await db.select().from(brokerCredentials).where(eq(brokerCredentials.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async upsertBrokerCredential(credential: InsertBrokerCredential): Promise<BrokerCredential> {
+    const existing = await this.getBrokerCredential(credential.userId);
+    
+    if (existing) {
+      const result = await db.update(brokerCredentials).set(credential).where(eq(brokerCredentials.userId, credential.userId)).returning();
+      return result[0];
+    } else {
+      const result = await db.insert(brokerCredentials).values(credential).returning();
+      return result[0];
+    }
+  }
+
+  async updateBrokerCredential(userId: string, updates: Partial<InsertBrokerCredential>): Promise<BrokerCredential | undefined> {
+    const result = await db.update(brokerCredentials).set(updates).where(eq(brokerCredentials.userId, userId)).returning();
+    return result[0];
+  }
+
+  async deleteBrokerCredential(userId: string): Promise<boolean> {
+    const result = await db.delete(brokerCredentials).where(eq(brokerCredentials.userId, userId)).returning();
+    return result.length > 0;
   }
 }
 
