@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Activity, Settings, Terminal, Shield, LogOut } from "lucide-react";
+import { LayoutDashboard, Activity, Settings, Terminal, Shield, LogOut, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ConnectionDialog } from "./ConnectionDialog";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -46,7 +47,14 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-border/50">
+      <div className="p-4 border-t border-border/50 space-y-2">
+        <ConnectionDialog>
+          <button className="flex items-center gap-3 text-muted-foreground hover:text-primary w-full px-3 py-2 transition-colors">
+            <Globe className="w-5 h-5" />
+            <span className="hidden lg:block font-medium">Connect Account</span>
+          </button>
+        </ConnectionDialog>
+
         <button className="flex items-center gap-3 text-destructive hover:text-destructive/80 w-full px-3 py-2 transition-colors">
           <LogOut className="w-5 h-5" />
           <span className="hidden lg:block font-medium">Disconnect</span>
