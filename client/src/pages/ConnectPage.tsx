@@ -1,15 +1,39 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/trading/Sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plug, PlugZap, CheckCircle2, AlertCircle, Wallet } from "lucide-react";
-import { useBrokerStatus, useConnectBroker, useSelectBrokerAccount, useDisconnectBroker } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Loader2,
+  Plug,
+  PlugZap,
+  CheckCircle2,
+  AlertCircle,
+  Wallet,
+} from "lucide-react";
+import {
+  useBrokerStatus,
+  useConnectBroker,
+  useSelectBrokerAccount,
+  useDisconnectBroker,
+} from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import generatedImage from '@assets/generated_images/dark_futuristic_digital_trading_background_with_neon_data_streams.png';
+import generatedImage from "@assets/generated_images/dark_futuristic_digital_trading_background_with_neon_data_streams.png";
 
 interface BrokerAccount {
   id: number;
@@ -30,9 +54,13 @@ export default function ConnectPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [server, setServer] = useState("live.tradelocker.com");
-  const [availableAccounts, setAvailableAccounts] = useState<BrokerAccount[]>([]);
+  const [availableAccounts, setAvailableAccounts] = useState<BrokerAccount[]>(
+    [],
+  );
   const [selectedAccount, setSelectedAccount] = useState<string>("");
-  const [step, setStep] = useState<"login" | "select-account" | "connected">("login");
+  const [step, setStep] = useState<"login" | "select-account" | "connected">(
+    "login",
+  );
 
   const handleConnect = async () => {
     if (!email || !password || !server) {
@@ -45,7 +73,11 @@ export default function ConnectPage() {
     }
 
     try {
-      const result = await connectMutation.mutateAsync({ email, password, server });
+      const result = await connectMutation.mutateAsync({
+        email,
+        password,
+        server,
+      });
       if (result.success && result.accounts.length > 0) {
         setAvailableAccounts(result.accounts);
         setStep("select-account");
@@ -73,7 +105,9 @@ export default function ConnectPage() {
       return;
     }
 
-    const account = availableAccounts.find((a) => String(a.id) === selectedAccount);
+    const account = availableAccounts.find(
+      (a) => String(a.id) === selectedAccount,
+    );
     if (!account) return;
 
     try {
@@ -132,8 +166,8 @@ export default function ConnectPage() {
         className="fixed inset-0 z-0 opacity-5 pointer-events-none"
         style={{
           backgroundImage: `url(${generatedImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
       />
 
@@ -160,7 +194,8 @@ export default function ConnectPage() {
                   Connected to TradeLocker
                 </CardTitle>
                 <CardDescription>
-                  Your trading account is connected and ready for automated trading.
+                  Your trading account is connected and ready for automated
+                  trading.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -170,19 +205,27 @@ export default function ConnectPage() {
                       <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                       <span className="font-medium">Status</span>
                     </div>
-                    <Badge className="bg-primary/20 text-primary border-primary/30">ONLINE</Badge>
+                    <Badge className="bg-primary/20 text-primary border-primary/30">
+                      ONLINE
+                    </Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Email</span>
-                    <span className="font-mono text-sm text-muted-foreground">{status?.email}</span>
+                    <span className="font-mono text-sm text-muted-foreground">
+                      {status?.email}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Server</span>
-                    <span className="font-mono text-sm text-muted-foreground">{status?.server}</span>
+                    <span className="font-mono text-sm text-muted-foreground">
+                      {status?.server}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Account #</span>
-                    <span className="font-mono text-sm text-muted-foreground">{status?.accountNumber}</span>
+                    <span className="font-mono text-sm text-muted-foreground">
+                      {status?.accountNumber}
+                    </span>
                   </div>
                   {status?.lastConnected && (
                     <div className="flex items-center justify-between">
@@ -224,7 +267,10 @@ export default function ConnectPage() {
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label>Trading Account</Label>
-                  <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                  <Select
+                    value={selectedAccount}
+                    onValueChange={setSelectedAccount}
+                  >
                     <SelectTrigger data-testid="select-account">
                       <SelectValue placeholder="Select an account" />
                     </SelectTrigger>
@@ -234,7 +280,8 @@ export default function ConnectPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{account.name}</span>
                             <span className="text-muted-foreground">
-                              ({account.currency} {account.balance.toLocaleString()})
+                              ({account.currency}{" "}
+                              {account.balance.toLocaleString()})
                             </span>
                           </div>
                         </SelectItem>
@@ -246,20 +293,34 @@ export default function ConnectPage() {
                 {selectedAccount && (
                   <div className="p-4 rounded bg-muted/30 border border-border/50 space-y-2">
                     {(() => {
-                      const account = availableAccounts.find((a) => String(a.id) === selectedAccount);
+                      const account = availableAccounts.find(
+                        (a) => String(a.id) === selectedAccount,
+                      );
                       if (!account) return null;
                       return (
                         <>
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Balance</span>
-                            <span className="font-mono">{account.currency} {account.balance.toLocaleString()}</span>
+                            <span className="text-muted-foreground">
+                              Balance
+                            </span>
+                            <span className="font-mono">
+                              {account.currency}{" "}
+                              {account.balance.toLocaleString()}
+                            </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Equity</span>
-                            <span className="font-mono">{account.currency} {account.equity.toLocaleString()}</span>
+                            <span className="text-muted-foreground">
+                              Equity
+                            </span>
+                            <span className="font-mono">
+                              {account.currency}{" "}
+                              {account.equity.toLocaleString()}
+                            </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Account #</span>
+                            <span className="text-muted-foreground">
+                              Account #
+                            </span>
                             <span className="font-mono">{account.accNum}</span>
                           </div>
                         </>
@@ -283,7 +344,9 @@ export default function ConnectPage() {
                   <Button
                     onClick={handleSelectAccount}
                     className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-[0_0_15px_rgba(0,255,128,0.2)]"
-                    disabled={!selectedAccount || selectAccountMutation.isPending}
+                    disabled={
+                      !selectedAccount || selectAccountMutation.isPending
+                    }
                     data-testid="button-select-account"
                   >
                     {selectAccountMutation.isPending ? (
@@ -304,7 +367,8 @@ export default function ConnectPage() {
                   Connect TradeLocker
                 </CardTitle>
                 <CardDescription>
-                  Enter your TradeLocker credentials to connect your trading account.
+                  Enter your TradeLocker credentials to connect your trading
+                  account.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -341,8 +405,15 @@ export default function ConnectPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="live.tradelocker.com">Live Server (live.tradelocker.com)</SelectItem>
-                      <SelectItem value="demo.tradelocker.com">Demo Server (demo.tradelocker.com)</SelectItem>
+                      <SelectItem value="live.tradelocker.com">
+                        Live Server (live.tradelocker.com)
+                      </SelectItem>
+                      <SelectItem value="demo.tradelocker.com">
+                        Demo Server (demo.tradelocker.com)
+                      </SelectItem>
+                      <SelectItem value="HEROFX">
+                        HeroFX Server (HEROFX)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
@@ -353,8 +424,9 @@ export default function ConnectPage() {
                 <div className="p-3 rounded bg-yellow-500/10 border border-yellow-500/20 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5" />
                   <p className="text-xs text-yellow-500">
-                    Your credentials are securely stored and only used to authenticate with TradeLocker.
-                    We never store your password in plain text.
+                    Your credentials are securely stored and only used to
+                    authenticate with TradeLocker. We never store your password
+                    in plain text.
                   </p>
                 </div>
 
