@@ -146,8 +146,15 @@ export function MarketChart() {
          });
       }
     }
-    // @ts-ignore
-    candles.setMarkers(markers);
+    
+    // Safely set markers
+    if (candles && typeof candles.setMarkers === 'function') {
+        try {
+            candles.setMarkers(markers as any[]);
+        } catch (e) {
+            console.error("Failed to set markers", e);
+        }
+    }
 
     // Cleanup
     return () => {
