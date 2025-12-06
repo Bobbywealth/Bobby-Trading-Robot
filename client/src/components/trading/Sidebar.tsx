@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Activity, Settings, Terminal, Shield, LogOut, Globe } from "lucide-react";
+import { LayoutDashboard, Activity, Settings, Terminal, Shield, LogOut, Globe, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectionDialog } from "./ConnectionDialog";
 
@@ -9,6 +9,7 @@ export function Sidebar() {
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/" },
     { icon: Activity, label: "Live Trades", href: "/trades" },
+    { icon: Code, label: "Strategy", href: "/strategy" },
     { icon: Terminal, label: "Logs", href: "/logs" },
     { icon: Shield, label: "Risk Config", href: "/risk" },
     { icon: Settings, label: "Settings", href: "/settings" },
