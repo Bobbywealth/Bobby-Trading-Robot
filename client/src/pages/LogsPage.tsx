@@ -5,46 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Download, Trash2, Filter, Terminal } from "lucide-react";
-import { useState, useEffect } from "react";
-
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  level: "INFO" | "WARN" | "ERROR" | "SUCCESS";
-  module: string;
-  message: string;
-}
-
-const MOCK_LOGS: LogEntry[] = [
-  { id: "1", timestamp: "10:42:05", level: "INFO", module: "SYS", message: "Bot initialized successfully. version=2.1.0" },
-  { id: "2", timestamp: "10:42:06", level: "INFO", module: "CONN", message: "Connected to TradeLocker Demo (Latency: 12ms)" },
-  { id: "3", timestamp: "10:45:22", level: "INFO", module: "STRAT", message: "Scanning 28 pairs for 'EMA Crossover' setup..." },
-  { id: "4", timestamp: "10:45:23", level: "SUCCESS", module: "STRAT", message: "Signal Found: BUY XAUUSD @ 2038.10" },
-  { id: "5", timestamp: "10:45:23", level: "INFO", module: "EXEC", message: "Order sent: BUY 0.5 lots XAUUSD" },
-  { id: "6", timestamp: "10:45:24", level: "SUCCESS", module: "EXEC", message: "Order filled: #ORD-7831 @ 2038.10" },
-  { id: "7", timestamp: "11:02:15", level: "WARN", module: "RISK", message: "High volatility detected on GBPUSD (News Event)" },
-  { id: "8", timestamp: "11:05:00", level: "INFO", module: "STRAT", message: "Skipping GBPUSD trade due to news filter" },
-  { id: "9", timestamp: "11:15:30", level: "ERROR", module: "CONN", message: "Heartbeat missed. Retrying connection..." },
-  { id: "10", timestamp: "11:15:31", level: "SUCCESS", module: "CONN", message: "Connection re-established." },
-];
+import { useState } from "react";
+import { useSystemLogs } from "@/lib/api";
+import { format } from "date-fns";
 
 export default function LogsPage() {
-  const [logs, setLogs] = useState<LogEntry[]>(MOCK_LOGS);
-  
-  // Simulate live logs
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const newLog: LogEntry = {
-        id: Date.now().toString(),
-        timestamp: new Date().toLocaleTimeString('en-GB'),
-        level: Math.random() > 0.9 ? "WARN" : "INFO",
-        module: Math.random() > 0.5 ? "STRAT" : "SYS",
-        message: "Monitoring active positions... No changes required."
-      };
-      setLogs(prev => [...prev.slice(-49), newLog]);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  const { data: logs = [], isLoading } = useSystemLogs(100);
+  const [searchTerm, setSearchTerm] = useState("");
 
   return (
     <div className="flex min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/30">
@@ -63,12 +30,12 @@ export default function LogsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" data-testid="button-export">
               <Download className="w-4 h-4 mr-2" /> Export
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setLogs([])}>
-              <Trash2 className="w-4 h-4 mr-2" /> Clear
-            </Button>
+            <Badge variant="secondary" className="font-mono" data-testid="badge-log-count">
+              {logs.length} LOGS
+            </Badge>
           </div>
         </header>
 
@@ -78,7 +45,10 @@ export default function LogsPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Search logs..." 
-                className="pl-9 h-9 bg-background/50 border-border/50 font-mono text-sm" 
+                className="pl-9 h-9 bg-background/50 border-border/50 font-mono text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                data-testid="input-search"
               />
             </div>
             <div className="flex items-center gap-1 ml-auto">
@@ -92,30 +62,50 @@ export default function LogsPage() {
           </div>
 
           <ScrollArea className="flex-1 p-4 font-mono text-sm">
-            <div className="space-y-1">
-              {logs.map((log) => (
-                <div key={log.id} className="flex items-start gap-3 hover:bg-white/5 p-0.5 rounded px-2 group">
-                  <span className="text-muted-foreground opacity-50 w-20 shrink-0">{log.timestamp}</span>
-                  <Badge 
-                    variant="outline" 
-                    className={`w-16 justify-center text-[10px] h-5 border-0 ${
-                      log.level === 'INFO' ? 'bg-blue-500/10 text-blue-500' :
-                      log.level === 'WARN' ? 'bg-yellow-500/10 text-yellow-500' :
-                      log.level === 'ERROR' ? 'bg-red-500/10 text-red-500' :
-                      'bg-green-500/10 text-green-500'
-                    }`}
-                  >
-                    {log.level}
-                  </Badge>
-                  <span className="text-purple-400 w-12 shrink-0 font-bold text-xs pt-0.5">{log.module}</span>
-                  <span className="text-foreground/80 group-hover:text-foreground transition-colors break-all">
-                    {log.message}
-                  </span>
-                </div>
-              ))}
-              <div className="h-4" /> {/* Spacer */}
-              <div className="animate-pulse text-primary/50">_</div>
-            </div>
+            {isLoading ? (
+              <div className="text-center py-8 text-muted-foreground" data-testid="text-loading">
+                Loading logs...
+              </div>
+            ) : logs.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground" data-testid="text-no-logs">
+                No logs yet
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {logs
+                  .filter(log => 
+                    searchTerm === "" || 
+                    log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    log.module.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    log.level.toLowerCase().includes(searchTerm.toLowerCase())
+                  )
+                  .map((log) => (
+                    <div key={log.id} className="flex items-start gap-3 hover:bg-white/5 p-0.5 rounded px-2 group" data-testid={`log-entry-${log.id}`}>
+                      <span className="text-muted-foreground opacity-50 w-20 shrink-0" data-testid={`text-timestamp-${log.id}`}>
+                        {format(new Date(log.timestamp), 'HH:mm:ss')}
+                      </span>
+                      <Badge 
+                        variant="outline" 
+                        className={`w-16 justify-center text-[10px] h-5 border-0 ${
+                          log.level === 'info' ? 'bg-blue-500/10 text-blue-500' :
+                          log.level === 'warn' ? 'bg-yellow-500/10 text-yellow-500' :
+                          log.level === 'error' ? 'bg-red-500/10 text-red-500' :
+                          'bg-green-500/10 text-green-500'
+                        }`}
+                        data-testid={`badge-level-${log.id}`}
+                      >
+                        {log.level.toUpperCase()}
+                      </Badge>
+                      <span className="text-purple-400 w-12 shrink-0 font-bold text-xs pt-0.5" data-testid={`text-module-${log.id}`}>{log.module}</span>
+                      <span className="text-foreground/80 group-hover:text-foreground transition-colors break-all" data-testid={`text-message-${log.id}`}>
+                        {log.message}
+                      </span>
+                    </div>
+                  ))}
+                <div className="h-4" />
+                <div className="animate-pulse text-primary/50">_</div>
+              </div>
+            )}
           </ScrollArea>
         </Card>
       </main>

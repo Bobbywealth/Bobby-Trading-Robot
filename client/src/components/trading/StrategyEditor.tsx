@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Play, Save, RotateCcw, Code, Zap, Layers, BookOpen } from "lucide-react";
+import { Play, Save, RotateCcw, Code, Zap, Layers, BookOpen, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +16,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useStrategies, useCreateStrategy, useUpdateStrategy } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 const TEMPLATES = {
   ema_crossover: `def on_tick(data, account):
@@ -97,6 +99,68 @@ const TEMPLATES = {
 export function StrategyEditor() {
   const [strategyType, setStrategyType] = useState("custom");
   const [code, setCode] = useState(TEMPLATES.ema_crossover);
+  const [strategyName, setStrategyName] = useState("EMA Crossover");
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null);
+
+  const { data: strategies = [], isLoading: isLoadingStrategies } = useStrategies();
+  const createStrategy = useCreateStrategy();
+  const updateStrategy = useUpdateStrategy();
+  const { toast } = useToast();
+
+  const handleSaveStrategy = async () => {
+    try {
+      const strategyData = {
+        name: strategyName,
+        code: code,
+        parameters: { strategyType },
+        isActive: false,
+      };
+
+      if (selectedStrategyId) {
+        await updateStrategy.mutateAsync({ id: selectedStrategyId, data: strategyData });
+        toast({
+          title: "Strategy Updated",
+          description: `${strategyName} has been updated successfully.`,
+        });
+      } else {
+        const newStrategy = await createStrategy.mutateAsync(strategyData);
+        setSelectedStrategyId(newStrategy.id);
+        toast({
+          title: "Strategy Saved",
+          description: `${strategyName} has been saved successfully.`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save strategy. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLoadStrategy = (strategyId: string) => {
+    const strategy = strategies.find(s => s.id === strategyId);
+    if (strategy) {
+      setSelectedStrategyId(strategy.id);
+      setStrategyName(strategy.name);
+      setCode(strategy.code);
+      if (strategy.parameters && typeof strategy.parameters === 'object' && 'strategyType' in strategy.parameters) {
+        setStrategyType(strategy.parameters.strategyType as string);
+      }
+      toast({
+        title: "Strategy Loaded",
+        description: `${strategy.name} has been loaded.`,
+      });
+    }
+  };
+
+  const handleNewStrategy = () => {
+    setSelectedStrategyId(null);
+    setStrategyName("New Strategy");
+    setCode(TEMPLATES.ema_crossover);
+    setStrategyType("custom");
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
@@ -113,9 +177,44 @@ export function StrategyEditor() {
         </CardHeader>
         <CardContent className="space-y-6 flex-1 overflow-y-auto">
           <div className="space-y-2">
+            <Label>Strategy Name</Label>
+            <Input 
+              value={strategyName} 
+              onChange={(e) => setStrategyName(e.target.value)}
+              className="font-mono"
+              data-testid="input-strategy-name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Load Existing Strategy</Label>
+            <Select value={selectedStrategyId || ""} onValueChange={handleLoadStrategy}>
+              <SelectTrigger data-testid="select-load-strategy">
+                <SelectValue placeholder="Select a strategy..." />
+              </SelectTrigger>
+              <SelectContent>
+                {strategies.map((strategy) => (
+                  <SelectItem key={strategy.id} value={strategy.id} data-testid={`option-strategy-${strategy.id}`}>
+                    {strategy.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleNewStrategy} 
+              className="w-full"
+              data-testid="button-new-strategy"
+            >
+              New Strategy
+            </Button>
+          </div>
+
+          <div className="space-y-2">
             <Label>Strategy Mode</Label>
             <Select value={strategyType} onValueChange={setStrategyType}>
-              <SelectTrigger>
+              <SelectTrigger data-testid="select-strategy-mode">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -231,8 +330,18 @@ export function StrategyEditor() {
             >
               <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reset
             </Button>
-            <Button size="sm" className="h-7 bg-primary text-primary-foreground hover:bg-primary/90">
-              <Save className="w-3.5 h-3.5 mr-1" /> Save Strategy
+            <Button 
+              size="sm" 
+              className="h-7 bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={handleSaveStrategy}
+              disabled={createStrategy.isPending || updateStrategy.isPending}
+              data-testid="button-save-strategy"
+            >
+              {(createStrategy.isPending || updateStrategy.isPending) ? (
+                <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> Saving...</>
+              ) : (
+                <><Save className="w-3.5 h-3.5 mr-1" /> Save Strategy</>
+              )}
             </Button>
           </div>
         </div>
