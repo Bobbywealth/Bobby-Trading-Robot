@@ -257,7 +257,8 @@ export class TradeLockerService {
     }
 
     const now = Date.now();
-    const fromTime = from || now - 7 * 24 * 60 * 60 * 1000;
+    const fromTime = from || now - 7 * 24 * 60
+      * 60 * 1000;
     const toTime = to || now;
 
     const response = await this.request<{ d: { bars: any[] } }>(
