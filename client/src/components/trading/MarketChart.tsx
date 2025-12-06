@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { createChart, ColorType, CrosshairMode, IChartApi, ISeriesApi, Time } from "lightweight-charts";
+import { createChart, ColorType, CrosshairMode, IChartApi, ISeriesApi, Time, CandlestickSeries, LineSeries } from "lightweight-charts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,7 +80,7 @@ export function MarketChart() {
     chartRef.current = chart;
 
     // 2. Add Candlestick Series
-    const candles = chart.addCandlestickSeries({
+    const candles = chart.addSeries(CandlestickSeries, {
       upColor: '#22c55e',
       downColor: '#ef4444',
       borderVisible: false,
@@ -90,7 +90,7 @@ export function MarketChart() {
     setCandleSeries(candles);
 
     // 3. Add Strategy Lines (EMAs)
-    const fastEma = chart.addLineSeries({
+    const fastEma = chart.addSeries(LineSeries, {
       color: '#22d3ee', // Cyan
       lineWidth: 2,
       crosshairMarkerVisible: false,
@@ -99,7 +99,7 @@ export function MarketChart() {
     });
     setFastEmaSeries(fastEma);
 
-    const slowEma = chart.addLineSeries({
+    const slowEma = chart.addSeries(LineSeries, {
       color: '#c084fc', // Purple
       lineWidth: 2,
       crosshairMarkerVisible: false,
