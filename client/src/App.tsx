@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import StrategyPage from "@/pages/StrategyPage";
+import LogsPage from "@/pages/LogsPage";
+import RiskPage from "@/pages/RiskPage";
 
 function Router() {
   return (
@@ -14,6 +16,8 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/trades" component={Dashboard} />
       <Route path="/strategy" component={StrategyPage} />
+      <Route path="/logs" component={LogsPage} />
+      <Route path="/risk" component={RiskPage} />
       <Route path="/settings" component={Dashboard} />
       <Route component={NotFound} />
     </Switch>
