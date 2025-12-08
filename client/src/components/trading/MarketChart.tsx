@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, EyeOff, Maximize2, Wifi, WifiOff } from "lucide-react";
+import { Eye, EyeOff, Maximize2, Wifi, WifiOff, TrendingUp } from "lucide-react";
 import { useBrokerStatus, useBrokerQuotes } from "@/lib/api";
 
 // Generate realistic candlestick data
@@ -44,13 +44,64 @@ const calculateEMA = (data: any[], period: number) => {
   });
 };
 
+// Calculate Support and Resistance Levels
+const calculateSupportResistance = (data: any[], lookback: number = 10) => {
+  const levels: { price: number; type: 'support' | 'resistance'; strength: number }[] = [];
+  
+  // Find swing highs and lows
+  for (let i = lookback; i < data.length - lookback; i++) {
+    let isSwingHigh = true;
+    let isSwingLow = true;
+    
+    for (let j = 1; j <= lookback; j++) {
+      if (data[i].high <= data[i - j].high || data[i].high <= data[i + j].high) {
+        isSwingHigh = false;
+      }
+      if (data[i].low >= data[i - j].low || data[i].low >= data[i + j].low) {
+        isSwingLow = false;
+      }
+    }
+    
+    if (isSwingHigh) {
+      levels.push({ price: data[i].high, type: 'resistance', strength: 1 });
+    }
+    if (isSwingLow) {
+      levels.push({ price: data[i].low, type: 'support', strength: 1 });
+    }
+  }
+  
+  // Cluster nearby levels and increase strength
+  const tolerance = (Math.max(...data.map(d => d.high)) - Math.min(...data.map(d => d.low))) * 0.01;
+  const clusteredLevels: { price: number; type: 'support' | 'resistance'; strength: number }[] = [];
+  
+  levels.forEach(level => {
+    const existingLevel = clusteredLevels.find(
+      l => Math.abs(l.price - level.price) < tolerance && l.type === level.type
+    );
+    
+    if (existingLevel) {
+      existingLevel.strength++;
+      existingLevel.price = (existingLevel.price + level.price) / 2;
+    } else {
+      clusteredLevels.push({ ...level });
+    }
+  });
+  
+  // Sort by strength and return top levels
+  return clusteredLevels
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, 6);
+};
+
 export function MarketChart() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [showStrategy, setShowStrategy] = useState(true);
+  const [showLevels, setShowLevels] = useState(true);
   const [candleSeries, setCandleSeries] = useState<ISeriesApi<"Candlestick"> | null>(null);
   const [fastEmaSeries, setFastEmaSeries] = useState<ISeriesApi<"Line"> | null>(null);
   const [slowEmaSeries, setSlowEmaSeries] = useState<ISeriesApi<"Line"> | null>(null);
+  const [srLevels, setSrLevels] = useState<{ price: number; type: 'support' | 'resistance'; strength: number }[]>([]);
   
   const { data: brokerStatus } = useBrokerStatus();
   const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
@@ -125,7 +176,23 @@ export function MarketChart() {
     fastEma.setData(fastEmaData);
     slowEma.setData(slowEmaData);
 
-    // 5. Add Strategy Markers (Signals)
+    // 5. Calculate and Draw Support/Resistance Levels
+    const levels = calculateSupportResistance(initialData, 8);
+    setSrLevels(levels);
+    
+    // Add price lines for S/R levels
+    levels.forEach((level, index) => {
+      candles.createPriceLine({
+        price: level.price,
+        color: level.type === 'resistance' ? '#ef4444' : '#22c55e',
+        lineWidth: level.strength > 2 ? 2 : 1,
+        lineStyle: 2, // Dashed
+        axisLabelVisible: true,
+        title: level.type === 'resistance' ? `R${index + 1}` : `S${index + 1}`,
+      });
+    });
+
+    // 6. Add Strategy Markers (Signals)
     const markers = [];
     for (let i = 20; i < initialData.length; i++) {
       const prevFast = fastEmaData[i-1].value;
@@ -226,6 +293,18 @@ export function MarketChart() {
                 </div>
               </div>
             )}
+            {showLevels && srLevels.length > 0 && (
+              <div className="flex items-center gap-3 text-xs animate-in fade-in">
+                <div className="flex items-center gap-1.5 bg-red-500/10 px-2 py-1 rounded border border-red-500/20">
+                  <div className="w-2 h-0.5 bg-red-400" />
+                  <span className="text-red-400 font-mono">Resistance</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-green-500/10 px-2 py-1 rounded border border-green-500/20">
+                  <div className="w-2 h-0.5 bg-green-400" />
+                  <span className="text-green-400 font-mono">Support</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -235,8 +314,19 @@ export function MarketChart() {
             className="h-8 w-8 bg-background/50 border-border/50"
             onClick={() => setShowStrategy(!showStrategy)}
             title="Toggle Strategy"
+            data-testid="button-toggle-strategy"
           >
             {showStrategy ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className={`h-8 w-8 bg-background/50 border-border/50 ${showLevels ? 'text-primary border-primary/50' : ''}`}
+            onClick={() => setShowLevels(!showLevels)}
+            title="Toggle Support/Resistance Levels"
+            data-testid="button-toggle-levels"
+          >
+            <TrendingUp className="w-4 h-4" />
           </Button>
           <Button variant="outline" size="icon" className="h-8 w-8 bg-background/50 border-border/50">
              <Maximize2 className="w-4 h-4" />
