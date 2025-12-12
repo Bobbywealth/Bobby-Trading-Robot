@@ -10,6 +10,7 @@ import LogsPage from "@/pages/LogsPage";
 import RiskPage from "@/pages/RiskPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ConnectPage from "@/pages/ConnectPage";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 function Router() {
   return (
@@ -31,6 +32,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <ThemeToggle className="fixed top-4 right-4 z-50" />
         <Toaster />
         <Router />
       </TooltipProvider>
