@@ -46,7 +46,12 @@ interface BrokerAccount {
 
 export default function ConnectPage() {
   const { toast } = useToast();
-  const { data: status, isLoading: statusLoading } = useBrokerStatus();
+  const {
+    data: status,
+    isLoading: statusLoading,
+    error: statusError,
+    refetch: refetchStatus,
+  } = useBrokerStatus();
   const connectMutation = useConnectBroker();
   const selectAccountMutation = useSelectBrokerAccount();
   const disconnectMutation = useDisconnectBroker();
@@ -156,6 +161,36 @@ export default function ConnectPage() {
     return (
       <div className="flex min-h-screen bg-background text-foreground items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (statusError) {
+    return (
+      <div className="flex min-h-screen bg-background text-foreground items-center justify-center px-4">
+        <Card className="max-w-md w-full border-destructive/30 bg-card/40 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="w-5 h-5" />
+              Unable to reach server
+            </CardTitle>
+            <CardDescription>
+              {statusError instanceof Error
+                ? statusError.message
+                : "The server is not responding. Check the backend is running."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => refetchStatus()}
+              data-testid="button-retry-status"
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

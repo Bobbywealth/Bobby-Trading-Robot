@@ -1,5 +1,28 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+const DEFAULT_TIMEOUT_MS = 15000;
+
+function withTimeout(
+  promise: Promise<Response>,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  return promise
+    .then((res) => {
+      clearTimeout(timeout);
+      return res;
+    })
+    .catch((err) => {
+      clearTimeout(timeout);
+      if (err?.name === "AbortError") {
+        throw new Error("Request timed out");
+      }
+      throw err;
+    });
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,12 +35,14 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  const res = await withTimeout(
+    fetch(url, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    }),
+  );
 
   await throwIfResNotOk(res);
   return res;
@@ -29,9 +54,11 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
-    });
+    const res = await withTimeout(
+      fetch(queryKey.join("/") as string, {
+        credentials: "include",
+      }),
+    );
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
