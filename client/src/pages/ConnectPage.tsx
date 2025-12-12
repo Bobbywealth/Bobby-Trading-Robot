@@ -96,14 +96,14 @@ export default function ConnectPage() {
         setAvailableAccounts(result.accounts);
         setStep("select-account");
         toast({
-          title: "Connected!",
+          title: "Connected to TradeZilla",
           description: `Found ${result.accounts.length} trading account(s)`,
         });
       }
     } catch (error: any) {
       toast({
         title: "Connection failed",
-        description: error.message || "Failed to connect to TradeLocker",
+        description: error.message || "Failed to connect to TradeZilla",
         variant: "destructive",
       });
     }
@@ -153,7 +153,7 @@ export default function ConnectPage() {
       setPassword("");
       toast({
         title: "Disconnected",
-        description: "Successfully disconnected from TradeLocker",
+        description: "Successfully disconnected from TradeZilla",
       });
     } catch (error: any) {
       toast({
@@ -220,13 +220,17 @@ export default function ConnectPage() {
       </div>
 
       <main className="flex-1 p-4 lg:p-6 overflow-y-auto z-10 relative h-screen">
-        <header className="mb-6">
-          <h1 className="text-2xl font-display font-bold text-foreground tracking-wide flex items-center gap-2">
-            BROKER CONNECTION <span className="text-muted-foreground">///</span>
-          </h1>
-          <p className="text-muted-foreground text-sm font-mono">
-            TRADELOCKER ACCOUNT INTEGRATION
-          </p>
+        <header className="mb-6 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h1 className="text-2xl font-display font-bold text-foreground tracking-wide flex items-center gap-2">
+                TRADEZILLA CONTROL <span className="text-muted-foreground">///</span>
+              </h1>
+              <p className="text-muted-foreground text-sm font-mono">
+                TradeZilla x TradeLocker — secure broker connection
+              </p>
+            </div>
+          </div>
         </header>
 
         <div className="max-w-2xl space-y-6">
@@ -235,7 +239,7 @@ export default function ConnectPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-primary">
                   <CheckCircle2 className="w-5 h-5" />
-                  Connected to TradeLocker
+                  Connected to TradeZilla
                 </CardTitle>
                 <CardDescription>
                   Your trading account is connected and ready for automated
@@ -298,7 +302,7 @@ export default function ConnectPage() {
               </CardContent>
             </Card>
           ) : step === "select-account" && availableAccounts.length > 0 ? (
-            <Card className="border-border/50 bg-card/30 backdrop-blur-sm">
+            <Card className="border-border/50 bg-card/30 backdrop-blur-sm shadow-[0_10px_40px_rgba(0,0,0,0.25)]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Wallet className="w-5 h-5 text-accent" />
@@ -408,10 +412,10 @@ export default function ConnectPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <PlugZap className="w-5 h-5 text-accent" />
-                  Connect TradeLocker
+                  Connect TradeZilla
                 </CardTitle>
                 <CardDescription>
-                  Enter your TradeLocker credentials to connect your trading
+                  Enter your TradeZilla credentials to connect your trading
                   account.
                 </CardDescription>
               </CardHeader>
@@ -469,7 +473,7 @@ export default function ConnectPage() {
                   <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5" />
                   <p className="text-xs text-yellow-500">
                     Your credentials are securely stored and only used to
-                    authenticate with TradeLocker. We never store your password
+                    authenticate with TradeZilla. We never store your password
                     in plain text.
                   </p>
                 </div>
@@ -485,7 +489,7 @@ export default function ConnectPage() {
                   ) : (
                     <PlugZap className="w-4 h-4 mr-2" />
                   )}
-                  Connect to TradeLocker
+                  Connect to TradeZilla
                 </Button>
               </CardContent>
             </Card>

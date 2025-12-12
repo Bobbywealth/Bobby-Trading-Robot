@@ -147,7 +147,7 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>TradeLocker API Key</Label>
+                  <Label>TradeZilla / TradeLocker API Key</Label>
                   <div className="flex gap-2">
                     <Input type="password" value="sk_live_xxxxxxxxxxxxxxxx" readOnly className="font-mono bg-muted/30" />
                     <Button variant="outline" size="icon"><Lock className="w-4 h-4" /></Button>

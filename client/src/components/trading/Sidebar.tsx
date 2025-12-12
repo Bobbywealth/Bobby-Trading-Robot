@@ -20,14 +20,14 @@ export function Sidebar() {
   return (
     <div className="w-16 lg:w-64 border-r border-border bg-card/50 backdrop-blur-sm flex flex-col h-screen sticky top-0">
       <div className="p-4 flex items-center gap-3 border-b border-border/50">
-        <div className="w-8 h-8 rounded bg-primary/20 border border-primary flex items-center justify-center">
-          <Activity className="w-5 h-5 text-primary" />
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/70 via-accent/60 to-primary/40 border border-primary/60 flex items-center justify-center shadow-[0_0_25px_rgba(0,255,128,0.35)]">
+          <Activity className="w-5 h-5 text-primary drop-shadow" />
         </div>
         <div className="hidden lg:flex flex-col">
           <span className="font-display font-bold text-xl tracking-wider text-foreground leading-tight">
-            TRADELOCKER
+            TRADEZILLA
           </span>
-          <span className="text-[10px] text-muted-foreground font-mono">UI v1.1</span>
+          <span className="text-[10px] text-muted-foreground font-mono">Autonomous Trading</span>
         </div>
       </div>
 

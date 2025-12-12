@@ -32,13 +32,13 @@ export function ConnectionDialog({ children }: { children: React.ReactNode }) {
             Connect Broker
           </DialogTitle>
           <DialogDescription>
-            Configure your connection to TradeLocker or MetaTrader gateway.
+            Configure your connection to TradeZilla’s TradeLocker gateway.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="tradelocker" className="w-full mt-4">
           <TabsList className="grid w-full grid-cols-2 bg-muted/50">
-            <TabsTrigger value="tradelocker">TradeLocker</TabsTrigger>
+            <TabsTrigger value="tradelocker">TradeZilla (TradeLocker)</TabsTrigger>
             <TabsTrigger value="mt5">MetaTrader 5</TabsTrigger>
           </TabsList>
           
@@ -50,8 +50,8 @@ export function ConnectionDialog({ children }: { children: React.ReactNode }) {
                   <SelectValue placeholder="Select environment" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="demo">TradeLocker Demo</SelectItem>
-                  <SelectItem value="live">TradeLocker Live</SelectItem>
+                  <SelectItem value="demo">TradeZilla Demo</SelectItem>
+                  <SelectItem value="live">TradeZilla Live</SelectItem>
                 </SelectContent>
               </Select>
             </div>
