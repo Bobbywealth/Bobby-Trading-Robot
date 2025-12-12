@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useBrokerStatus, useDisconnectBroker } from "@/lib/api";
 
 const LOGO_URL = "https://iili.io/f7qxA7f.png";
+const BRAND_NAME = "Bobby Trading Robot";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -32,7 +33,7 @@ export function Sidebar() {
         </div>
         <div className="hidden lg:flex flex-col">
           <span className="font-display font-bold text-xl tracking-wider text-foreground leading-tight">
-            TRADELOCKER
+            {BRAND_NAME}
           </span>
           <span className="text-[10px] text-muted-foreground font-mono">Autonomous Trading</span>
         </div>

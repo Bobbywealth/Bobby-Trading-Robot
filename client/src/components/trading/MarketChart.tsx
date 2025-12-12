@@ -478,7 +478,7 @@ export function MarketChart() {
             <div className="text-center space-y-1">
               <p className="font-semibold">Live feed disabled</p>
               <p className="text-xs text-muted-foreground max-w-xs">
-                Connect a TradeLocker account to stream real-time prices and orders.
+                Connect your broker account to stream real-time prices and orders.
               </p>
             </div>
             <Button asChild size="sm">
@@ -494,15 +494,28 @@ export function MarketChart() {
         )}
 
         {isConnected && isQuotesError && (
+          (() => {
+            const msg = (quotesError as Error)?.message ?? "Failed to fetch quotes from broker.";
+            const needsReconnect = msg.includes("401") || msg.toLowerCase().includes("expired");
+            return (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/90 backdrop-blur-sm border border-dashed border-destructive/40 m-3 rounded-lg text-center px-4">
             <Badge variant="outline" className="border-destructive/50 text-destructive bg-destructive/10">Live quotes unavailable</Badge>
             <p className="text-sm text-muted-foreground font-mono break-words">
-              {(quotesError as Error)?.message ?? "Failed to fetch quotes from broker."}
+              {msg}
             </p>
-            <Button size="sm" variant="outline" onClick={() => refetchQuotes()}>
-              Retry feed
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => refetchQuotes()}>
+                Retry feed
+              </Button>
+              {needsReconnect && (
+                <Button asChild size="sm">
+                  <Link href="/connect">Reconnect broker</Link>
+                </Button>
+              )}
+            </div>
           </div>
+            );
+          })()
         )}
 
         <div ref={chartContainerRef} className="absolute inset-0" />
