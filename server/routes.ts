@@ -407,9 +407,11 @@ export async function registerRoutes(
       }
       res.json(quotes);
     } catch (error: any) {
-      res.status(500).json({
+      const detail = error?.message || "Unknown error";
+      const status = detail.includes("Bad Request") || detail.includes("Header missing") ? 400 : 500;
+      res.status(status).json({
         error: "Failed to fetch quotes",
-        details: error?.message,
+        details: detail,
       });
     }
   });
@@ -435,9 +437,11 @@ export async function registerRoutes(
       const positions = await tradeLocker.getOpenPositions();
       res.json(positions);
     } catch (error: any) {
-      res.status(500).json({
+      const detail = error?.message || "Unknown error";
+      const status = detail.includes("Bad Request") || detail.includes("Header missing") ? 400 : 500;
+      res.status(status).json({
         error: "Failed to fetch positions",
-        details: error?.message,
+        details: detail,
       });
     }
   });

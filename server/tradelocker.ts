@@ -150,6 +150,8 @@ export class TradeLockerService {
             Authorization: `Bearer ${this.accessToken}`,
             "Accept": "application/json",
             accNum: String(this.accNum),
+            accountNumber: String(this.accNum),
+            "Account-Number": String(this.accNum),
           },
         }
       );
@@ -182,6 +184,8 @@ export class TradeLockerService {
               Authorization: `Bearer ${this.accessToken}`,
               "Accept": "application/json",
               accNum: String(this.accNum),
+              accountNumber: String(this.accNum),
+              "Account-Number": String(this.accNum),
             },
           }
         );
@@ -229,6 +233,8 @@ export class TradeLockerService {
             Authorization: `Bearer ${this.accessToken}`,
             "Accept": "application/json",
             accNum: String(this.accNum),
+            accountNumber: String(this.accNum),
+            "Account-Number": String(this.accNum),
           },
         }
       );
@@ -259,6 +265,8 @@ export class TradeLockerService {
             "Content-Type": "application/json",
             "Accept": "application/json",
             accNum: String(this.accNum),
+            accountNumber: String(this.accNum),
+            "Account-Number": String(this.accNum),
           },
           body: JSON.stringify({
             instrumentId: order.instrumentId,
