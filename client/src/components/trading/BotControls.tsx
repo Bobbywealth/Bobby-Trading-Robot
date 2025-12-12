@@ -7,16 +7,86 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Play, Pause, Wifi, Wallet, PlugZap, ShieldAlert } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Wifi,
+  Wallet,
+  PlugZap,
+  ShieldAlert,
+  TrendingUp,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  AlertTriangle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useBrokerStatus, useRiskConfig } from "@/lib/api";
+import {
+  useBrokerStatus,
+  useRiskConfig,
+  useBrokerInstruments,
+  useBrokerQuotes,
+  usePlaceOrder,
+} from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 export function BotControls() {
+  const { toast } = useToast();
   const [isActive, setIsActive] = useState(false);
   const [risk, setRisk] = useState([1.5]);
+  const [instrumentId, setInstrumentId] = useState<number | null>(null);
+  const [qty, setQty] = useState<number>(0.01);
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [type, setType] = useState<"market" | "limit" | "stop">("market");
+  const [price, setPrice] = useState<number | undefined>(undefined);
+  const [stopLoss, setStopLoss] = useState<number | undefined>(undefined);
+  const [takeProfit, setTakeProfit] = useState<number | undefined>(undefined);
+
   const { data: brokerStatus, isLoading: brokerLoading } = useBrokerStatus();
   const { data: riskConfig, isLoading: riskLoading } = useRiskConfig();
   const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
+  const instrumentsQuery = useBrokerInstruments(Boolean(isConnected));
+
+  const selectedInstrument = instrumentsQuery.data?.find(
+    (i) => i.tradableInstrumentId === instrumentId,
+  );
+  const quoteSymbols = selectedInstrument ? [selectedInstrument.name] : [];
+  const quotesQuery = useBrokerQuotes(quoteSymbols, Boolean(isConnected && instrumentId));
+  const latestQuote = quotesQuery.data?.[0];
+
+  const placeOrder = usePlaceOrder();
+
+  const submitOrder = async () => {
+    if (!instrumentId) return;
+    try {
+      await placeOrder.mutateAsync({
+        instrumentId,
+        qty,
+        side,
+        type,
+        price: type === "market" ? undefined : price,
+        stopLoss,
+        takeProfit,
+      });
+      toast({
+        title: "Order placed",
+        description: `${side.toUpperCase()} ${qty} on ${selectedInstrument?.name ?? instrumentId}`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Order failed",
+        description: err?.message || "Unable to place order",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -98,6 +168,143 @@ export function BotControls() {
             )}
           </div>
 
+          {isConnected && (
+            <div className="p-3 rounded border border-border/50 bg-background/40 space-y-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                <p className="text-sm font-medium">Place Order</p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Instrument</Label>
+                    <Select
+                      value={instrumentId ? String(instrumentId) : undefined}
+                      onValueChange={(val) => setInstrumentId(Number(val))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select instrument" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {instrumentsQuery.data?.map((inst) => (
+                          <SelectItem key={inst.tradableInstrumentId} value={String(inst.tradableInstrumentId)}>
+                            {inst.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Qty</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={qty}
+                      onChange={(e) => setQty(parseFloat(e.target.value))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <Button
+                    variant={side === "buy" ? "default" : "outline"}
+                    className="w-full"
+                    onClick={() => setSide("buy")}
+                  >
+                    <ArrowUpCircle className="w-4 h-4 mr-2" /> Buy
+                  </Button>
+                  <Button
+                    variant={side === "sell" ? "destructive" : "outline"}
+                    className="w-full"
+                    onClick={() => setSide("sell")}
+                  >
+                    <ArrowDownCircle className="w-4 h-4 mr-2" /> Sell
+                  </Button>
+                  <Select value={type} onValueChange={(v) => setType(v as any)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="market">Market</SelectItem>
+                      <SelectItem value="limit">Limit</SelectItem>
+                      <SelectItem value="stop">Stop</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {type !== "market" && (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Price</Label>
+                      <Input
+                        type="number"
+                        step={0.0001}
+                        value={price ?? ""}
+                        onChange={(e) => setPrice(e.target.value ? parseFloat(e.target.value) : undefined)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Stop Loss</Label>
+                      <Input
+                        type="number"
+                        step={0.0001}
+                        value={stopLoss ?? ""}
+                        onChange={(e) => setStopLoss(e.target.value ? parseFloat(e.target.value) : undefined)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Take Profit</Label>
+                      <Input
+                        type="number"
+                        step={0.0001}
+                        value={takeProfit ?? ""}
+                        onChange={(e) => setTakeProfit(e.target.value ? parseFloat(e.target.value) : undefined)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-2 rounded bg-muted/10 border border-dashed border-border/40 text-xs font-mono">
+                  <div className="flex justify-between">
+                    <span>Last Quote</span>
+                    <span>
+                      {latestQuote
+                        ? `${latestQuote.s} ${latestQuote.bid ?? "--"}/${latestQuote.ask ?? "--"}`
+                        : "—"}
+                    </span>
+                  </div>
+                  {placeOrder.isError && (
+                    <div className="flex items-start gap-2 text-destructive mt-2">
+                      <AlertTriangle className="w-3 h-3 mt-0.5" />
+                      <span>{(placeOrder.error as Error)?.message ?? "Order failed"}</span>
+                    </div>
+                  )}
+                  {instrumentsQuery.isError && (
+                    <div className="flex items-start gap-2 text-destructive mt-2">
+                      <AlertTriangle className="w-3 h-3 mt-0.5" />
+                      <span>Failed to load instruments</span>
+                    </div>
+                  )}
+                  {quotesQuery.isError && (
+                    <div className="flex items-start gap-2 text-destructive mt-2">
+                      <AlertTriangle className="w-3 h-3 mt-0.5" />
+                      <span>Failed to load quotes</span>
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  className="w-full"
+                  disabled={!instrumentId || placeOrder.isPending}
+                  onClick={submitOrder}
+                >
+                  {placeOrder.isPending ? "Placing..." : "Confirm Order"}
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="p-3 rounded border border-border/50 bg-background/40 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

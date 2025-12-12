@@ -255,11 +255,18 @@ export function useBrokerAccounts(enabled = false) {
   });
 }
 
-export function useBrokerQuotes(symbols: string[]) {
+export function useBrokerInstruments(enabled: boolean) {
+  return useQuery<Array<{ tradableInstrumentId: number; name: string; description?: string }>>({
+    queryKey: ["/api/broker/instruments"],
+    enabled,
+  });
+}
+
+export function useBrokerQuotes(symbols: string[], enabled = true) {
   const symbolsParam = symbols.join(",");
   return useQuery<Array<{ s: string; bid: number; ask: number; timestamp: number }>>({
     queryKey: [`/api/broker/quotes?symbols=${symbolsParam}`],
-    enabled: symbols.length > 0,
+    enabled: enabled && symbols.length > 0,
     refetchInterval: 1000,
   });
 }
@@ -268,5 +275,33 @@ export function useBrokerPositions() {
   return useQuery<any[]>({
     queryKey: ["/api/broker/positions"],
     refetchInterval: 5000,
+  });
+}
+
+export function usePlaceOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      instrumentId: number;
+      qty: number;
+      side: "buy" | "sell";
+      type: "market" | "limit" | "stop";
+      price?: number;
+      stopLoss?: number;
+      takeProfit?: number;
+    }) => {
+      const res = await apiRequest("POST", "/api/broker/orders", data);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const message = body?.error || body?.details || `HTTP ${res.status}`;
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/positions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/quotes"] });
+    },
   });
 }
