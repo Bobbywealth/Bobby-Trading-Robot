@@ -10,6 +10,7 @@ const storageMock = vi.hoisted(() => ({
   getStrategy: vi.fn(),
   updateStrategy: vi.fn(),
   deleteStrategy: vi.fn(),
+  ensureUser: vi.fn(),
   getRiskConfig: vi.fn(),
   upsertRiskConfig: vi.fn(),
   getTrades: vi.fn(),
