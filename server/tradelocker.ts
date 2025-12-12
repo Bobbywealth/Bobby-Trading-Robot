@@ -64,6 +64,46 @@ export class TradeLockerService {
   private refreshToken: string | null = null;
   private accNum: number | null = null;
 
+  private async refresh(): Promise<void> {
+    if (!this.refreshToken) {
+      throw new Error("Missing refresh token");
+    }
+    const response = await fetch(`${this.baseUrl}/backend-api/auth/jwt/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        refreshToken: this.refreshToken,
+      }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Token refresh failed: ${response.status} ${JSON.stringify(errorData)}`
+      );
+    }
+    const data = await response.json();
+    this.accessToken = data.accessToken;
+    this.refreshToken = data.refreshToken ?? this.refreshToken;
+  }
+
+  private async withRefresh<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const message = String(err?.message || "");
+      const shouldRefresh =
+        message.includes("401") ||
+        message.toLowerCase().includes("unauthorized") ||
+        message.toLowerCase().includes("expired");
+      if (!shouldRefresh) throw err;
+      await this.refresh();
+      return await fn();
+    }
+  }
+
   constructor(server: string = "live.tradelocker.com") {
     this.serverName = server;
     const mappedServer = mapServerToUrl(server);
@@ -91,7 +131,6 @@ export class TradeLockerService {
       },
       body: JSON.stringify({
         refreshToken: this.refreshToken,
-        server: this.serverName,
       }),
     });
 
