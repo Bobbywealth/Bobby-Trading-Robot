@@ -12,6 +12,25 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 
+function parseTimeToMinutes(value?: string | null): number | null {
+  if (!value) return null;
+  const [h, m] = value.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+function isWithinTradingWindow(start?: string | null, end?: string | null, now: Date = new Date()): boolean {
+  const startMin = parseTimeToMinutes(start);
+  const endMin = parseTimeToMinutes(end);
+  if (startMin === null || endMin === null) return true;
+
+  const currentMin = now.getHours() * 60 + now.getMinutes();
+  if (startMin <= endMin) {
+    return currentMin >= startMin && currentMin <= endMin;
+  }
+  return currentMin >= startMin || currentMin <= endMin;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -436,6 +455,26 @@ export async function registerRoutes(
       }
       if (!credential.accountNumber) {
         return res.status(409).json({ error: "No account selected. Please select an account first." });
+      }
+
+      const riskConfig = await storage.getRiskConfig(MOCK_USER_ID);
+      if (riskConfig) {
+        const withinWindow = isWithinTradingWindow(
+          riskConfig.tradingHoursStart,
+          riskConfig.tradingHoursEnd,
+        );
+        if (!withinWindow) {
+          return res.status(409).json({ error: "Trading window closed" });
+        }
+
+        const maxLotSize = riskConfig.maxLotSize ? Number(riskConfig.maxLotSize) : undefined;
+        if (maxLotSize && orderData.qty > maxLotSize) {
+          return res.status(409).json({ error: "Order size exceeds maxLotSize" });
+        }
+
+        if (riskConfig.maxPositionSize && orderData.qty > riskConfig.maxPositionSize) {
+          return res.status(409).json({ error: "Order size exceeds maxPositionSize" });
+        }
       }
 
       const tradeLocker = initializeTradeLockerService(

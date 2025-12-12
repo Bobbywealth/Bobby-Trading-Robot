@@ -179,6 +179,7 @@ describe("registerRoutes", () => {
       lastConnected: new Date(),
     });
 
+    storageMock.getRiskConfig.mockResolvedValue(null);
     tradeLockerMock.getInstruments.mockResolvedValue([
       { tradableInstrumentId: 1, name: "EURUSD", description: "", pipSize: 0.0001, lotSize: 100000, minOrderSize: 0.01, maxOrderSize: 100 },
     ]);
@@ -333,6 +334,67 @@ describe("registerRoutes", () => {
     });
 
     await request(app).get("/api/broker/quotes").expect(409);
+  });
+
+  it("blocks order when outside trading window or size exceeds limits", async () => {
+    const now = new Date();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
+
+    storageMock.getBrokerCredential.mockResolvedValue({
+      id: "c1",
+      userId: MOCK_USER_ID,
+      broker: "tradelocker",
+      email: "user@example.com",
+      server: "demo",
+      accessToken: "token",
+      refreshToken: "refresh",
+      accountId: "a1",
+      accountNumber: "123",
+      isConnected: true,
+      lastConnected: new Date(),
+    });
+
+    storageMock.getRiskConfig.mockResolvedValue({
+      id: "r1",
+      userId: MOCK_USER_ID,
+      maxDailyLossDollar: null,
+      maxDailyLossPercent: null,
+      maxPositionSize: 1,
+      maxLotSize: "0.5",
+      tradingHoursStart: "08:00",
+      tradingHoursEnd: "10:00",
+      newsFilterEnabled: false,
+      assetBlacklist: [],
+    });
+
+    const app = await setupApp();
+
+    const windowRes = await request(app)
+      .post("/api/broker/orders")
+      .send({ instrumentId: 1, qty: 0.1, side: "buy", type: "market" })
+      .expect(409);
+    expect(windowRes.body).toMatchObject({ error: "Trading window closed" });
+
+    storageMock.getRiskConfig.mockResolvedValue({
+      id: "r1",
+      userId: MOCK_USER_ID,
+      maxDailyLossDollar: null,
+      maxDailyLossPercent: null,
+      maxPositionSize: 1,
+      maxLotSize: "0.5",
+      tradingHoursStart: "00:00",
+      tradingHoursEnd: "23:59",
+      newsFilterEnabled: false,
+      assetBlacklist: [],
+    });
+
+    await request(app)
+      .post("/api/broker/orders")
+      .send({ instrumentId: 1, qty: 2, side: "buy", type: "market" })
+      .expect(409);
+
+    vi.useRealTimers();
   });
 });
 
