@@ -53,6 +53,7 @@ export function BotControls() {
   const { data: riskConfig, isLoading: riskLoading } = useRiskConfig();
   const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
   const instrumentsQuery = useBrokerInstruments(Boolean(isConnected));
+  const instruments = Array.isArray(instrumentsQuery.data) ? instrumentsQuery.data : [];
 
   const selectedInstrument = instrumentsQuery.data?.find(
     (i) => i.tradableInstrumentId === instrumentId,
@@ -187,7 +188,7 @@ export function BotControls() {
                         <SelectValue placeholder="Select instrument" />
                       </SelectTrigger>
                       <SelectContent>
-                        {instrumentsQuery.data?.map((inst) => (
+                        {instruments.map((inst) => (
                           <SelectItem key={inst.tradableInstrumentId} value={String(inst.tradableInstrumentId)}>
                             {inst.name}
                           </SelectItem>
