@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useBrokerStatus, useBrokerAccounts } from "@/lib/api";
 import generatedImage from '@assets/generated_images/dark_futuristic_digital_trading_background_with_neon_data_streams.png';
 
+const LOGO_URL = "https://iili.io/f7qxA7f.png";
+
 export default function Dashboard() {
   const { data: status } = useBrokerStatus();
   const isConnected = status?.connected && status?.accountNumber;
@@ -40,12 +42,22 @@ export default function Dashboard() {
       <main className="flex-1 p-4 lg:p-6 overflow-y-auto z-10 relative h-screen">
         <header className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold text-foreground tracking-wide">
-              DASHBOARD <span className="text-primary">///</span>
-            </h1>
-            <p className="text-muted-foreground text-sm font-mono">
-              SYSTEM: ONLINE | SERVER: TL-LIVE-04
-            </p>
+            <div className="flex items-center gap-3">
+              <img
+                src={LOGO_URL}
+                alt="TradeLocker Logo"
+                className="w-10 h-10 rounded-full border border-primary/50 shadow-[0_0_12px_rgba(0,255,128,0.25)]"
+                loading="lazy"
+              />
+              <div>
+                <h1 className="text-2xl font-display font-bold text-foreground tracking-wide">
+                  DASHBOARD <span className="text-primary">///</span>
+                </h1>
+                <p className="text-muted-foreground text-sm font-mono">
+                  SYSTEM: ONLINE | SERVER: TL-LIVE-04
+                </p>
+              </div>
+            </div>
           </div>
           <div className="hidden md:flex items-center gap-4">
             <div className="flex flex-col items-end gap-1">
