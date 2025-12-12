@@ -184,15 +184,27 @@ export class TradeLockerService {
           }
         );
 
-        if (response.ok) {
-          const data = await response.json();
-          quotes.push({
-            s: symbol,
-            bid: data.bid || data.b || 0,
-            ask: data.ask || data.a || 0,
-            timestamp: Date.now(),
-          });
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(
+            `Quote request failed for ${symbol}: ${response.status} ${response.statusText} ${text}`.trim()
+          );
         }
+
+        const data = await response.json();
+        const bid = data.bid ?? data.b;
+        const ask = data.ask ?? data.a;
+
+        if (typeof bid !== "number" || typeof ask !== "number") {
+          throw new Error(`Quote payload missing bid/ask for ${symbol}: ${JSON.stringify(data)}`);
+        }
+
+        quotes.push({
+          s: symbol,
+          bid,
+          ask,
+          timestamp: Date.now(),
+        });
       }
 
       return quotes;

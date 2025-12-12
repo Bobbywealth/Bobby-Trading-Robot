@@ -399,6 +399,12 @@ export async function registerRoutes(
       );
 
       const quotes = await tradeLocker.getQuotes(symbols);
+      if (!quotes.length) {
+        return res.status(502).json({
+          error: "Broker returned no quotes",
+          details: `Symbols: ${symbols.join(",")}`,
+        });
+      }
       res.json(quotes);
     } catch (error: any) {
       res.status(500).json({

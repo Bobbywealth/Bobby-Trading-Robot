@@ -137,7 +137,13 @@ export function MarketChart() {
   const { data: brokerStatus, isLoading: isStatusLoading } = useBrokerStatus();
   const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
 
-  const { data: liveQuotes, isLoading: quotesLoading } = useBrokerQuotes(isConnected ? ["XAUUSD"] : []);
+  const {
+    data: liveQuotes,
+    isLoading: quotesLoading,
+    error: quotesError,
+    isError: isQuotesError,
+    refetch: refetchQuotes,
+  } = useBrokerQuotes(isConnected ? ["XAUUSD"] : []);
   const livePrice = liveQuotes?.[0];
 
   // Initialize chart shell and series
@@ -484,6 +490,18 @@ export function MarketChart() {
         {isConnected && quotesLoading && (
           <div className="absolute inset-x-0 top-2 flex justify-center">
             <Badge variant="outline" className="bg-muted/40 text-xs">Syncing live quotes…</Badge>
+          </div>
+        )}
+
+        {isConnected && isQuotesError && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/90 backdrop-blur-sm border border-dashed border-destructive/40 m-3 rounded-lg text-center px-4">
+            <Badge variant="outline" className="border-destructive/50 text-destructive bg-destructive/10">Live quotes unavailable</Badge>
+            <p className="text-sm text-muted-foreground font-mono break-words">
+              {(quotesError as Error)?.message ?? "Failed to fetch quotes from broker."}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => refetchQuotes()}>
+              Retry feed
+            </Button>
           </div>
         )}
 
