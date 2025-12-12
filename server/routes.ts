@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, MOCK_USER_ID } from "./storage";
 import { createTradeLockerService, getTradeLockerService, clearTradeLockerService, initializeTradeLockerService } from "./tradelocker";
 import {
   insertStrategySchema,
@@ -35,8 +35,6 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  const MOCK_USER_ID = "00000000-0000-0000-0000-000000000001";
-
   // Ensure the mock user exists to satisfy FK constraints when storing credentials.
   await storage.ensureUser(MOCK_USER_ID);
 

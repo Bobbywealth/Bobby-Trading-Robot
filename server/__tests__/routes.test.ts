@@ -37,6 +37,7 @@ const tradeLockerMock = vi.hoisted(() => ({
 
 vi.mock("../storage", () => ({
   storage: storageMock,
+  MOCK_USER_ID: "00000000-0000-0000-0000-000000000001",
 }));
 
 vi.mock("../tradelocker", () => ({

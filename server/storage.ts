@@ -24,10 +24,13 @@ import {
   type InsertBrokerCredential,
 } from "@shared/schema";
 
+export const MOCK_USER_ID = "00000000-0000-0000-0000-000000000001";
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  ensureUser(userId: string): Promise<void>;
 
   getStrategies(userId: string): Promise<Strategy[]>;
   getStrategy(id: string): Promise<Strategy | undefined>;
@@ -55,6 +58,17 @@ export interface IStorage {
 }
 
 export class PostgreSQLStorage implements IStorage {
+  async ensureUser(userId: string): Promise<void> {
+    await db
+      .insert(users)
+      .values({
+        id: userId,
+        username: `user_${userId.slice(0, 8)}`,
+        password: "placeholder",
+      })
+      .onConflictDoNothing({ target: users.id });
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return result[0];
