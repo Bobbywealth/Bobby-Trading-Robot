@@ -138,7 +138,7 @@ describe("ConnectPage", () => {
 
     expect(mutateSelect).toHaveBeenCalledWith({
       accountId: "1",
-      accountNumber: 123,
+      accountNumber: "123",
     });
   });
 

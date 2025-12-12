@@ -8,7 +8,7 @@ interface Account {
   id: number;
   name: string;
   currency: string;
-  accNum: number;
+  accNum: string | number;
   accountBalance: number;
   accountEquity: number;
 }
@@ -62,7 +62,7 @@ export class TradeLockerService {
   private serverName: string;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
-  private accNum: number | null = null;
+  private accNum: string | number | null = null;
 
   private async refresh(): Promise<void> {
     if (!this.refreshToken) {
@@ -110,7 +110,7 @@ export class TradeLockerService {
     this.baseUrl = `https://${mappedServer}`;
   }
 
-  setCredentials(accessToken: string, refreshToken: string, accNum?: number) {
+  setCredentials(accessToken: string, refreshToken: string, accNum?: string | number) {
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
     if (accNum !== undefined) {
@@ -412,7 +412,7 @@ export function initializeTradeLockerService(
   server: string,
   accessToken: string,
   refreshToken: string,
-  accountNumber?: number
+  accountNumber?: string | number
 ): TradeLockerService {
   const cacheKey = `${userId}:${server}`;
   let service = serviceCache.get(cacheKey);
