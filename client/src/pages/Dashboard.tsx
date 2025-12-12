@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/trading/Sidebar";
 import { MarketChart } from "@/components/trading/MarketChart";
 import { ActiveTrades } from "@/components/trading/ActiveTrades";
 import { BotControls } from "@/components/trading/BotControls";
+import { QuickTrade } from "@/components/trading/QuickTrade";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useBrokerStatus, useBrokerAccounts } from "@/lib/api";
@@ -101,7 +102,8 @@ export default function Dashboard() {
           </div>
 
           {/* Right Column - Controls */}
-          <div className="lg:col-span-4 h-full overflow-y-auto pb-6">
+          <div className="lg:col-span-4 h-full overflow-y-auto pb-6 space-y-4">
+            <QuickTrade />
             <BotControls />
           </div>
         </div>
