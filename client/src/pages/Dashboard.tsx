@@ -1,10 +1,17 @@
+import { Link } from "wouter";
 import { Sidebar } from "@/components/trading/Sidebar";
 import { MarketChart } from "@/components/trading/MarketChart";
 import { ActiveTrades } from "@/components/trading/ActiveTrades";
 import { BotControls } from "@/components/trading/BotControls";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useBrokerStatus } from "@/lib/api";
 import generatedImage from '@assets/generated_images/dark_futuristic_digital_trading_background_with_neon_data_streams.png';
 
 export default function Dashboard() {
+  const { data: status } = useBrokerStatus();
+  const isConnected = status?.connected && status?.accountNumber;
+
   return (
     <div className="flex min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/30">
       {/* Background Image Overlay */}
@@ -34,15 +41,24 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="hidden md:flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Total Profit</div>
-              <div className="text-xl font-mono font-bold text-primary glow-text-primary">+$1,240.50</div>
+            <div className="flex flex-col items-end gap-1">
+              <Badge variant={isConnected ? "outline" : "secondary"} className={isConnected ? "border-primary/40 text-primary bg-primary/10" : "bg-muted text-muted-foreground"}>
+                {isConnected ? "Broker: Connected" : "Broker: Not connected"}
+              </Badge>
+              <p className="text-xs text-muted-foreground font-mono">
+                {isConnected ? `Account #${status?.accountNumber}` : "Live trading paused"}
+              </p>
             </div>
             <div className="h-8 w-[1px] bg-border/50 mx-2" />
             <div className="text-right">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Daily Gain</div>
               <div className="text-xl font-mono font-bold text-accent glow-text-accent">+2.4%</div>
             </div>
+            {!isConnected && (
+              <Button asChild size="sm" className="bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,255,128,0.15)]">
+                <Link href="/connect">Connect now</Link>
+              </Button>
+            )}
           </div>
         </header>
 

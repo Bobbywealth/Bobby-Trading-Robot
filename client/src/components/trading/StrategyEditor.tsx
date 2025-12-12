@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Play, Save, RotateCcw, Code, Zap, Layers, BookOpen, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -188,18 +189,26 @@ export function StrategyEditor() {
 
           <div className="space-y-2">
             <Label>Load Existing Strategy</Label>
-            <Select value={selectedStrategyId || ""} onValueChange={handleLoadStrategy}>
-              <SelectTrigger data-testid="select-load-strategy">
-                <SelectValue placeholder="Select a strategy..." />
-              </SelectTrigger>
-              <SelectContent>
-                {strategies.map((strategy) => (
-                  <SelectItem key={strategy.id} value={strategy.id} data-testid={`option-strategy-${strategy.id}`}>
-                    {strategy.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isLoadingStrategies ? (
+              <Skeleton className="h-10 w-full bg-muted/40" />
+            ) : strategies.length === 0 ? (
+              <div className="p-3 rounded border border-dashed border-border/50 text-xs text-muted-foreground bg-muted/20">
+                No saved strategies yet. Start from a template or create a new one.
+              </div>
+            ) : (
+              <Select value={selectedStrategyId || ""} onValueChange={handleLoadStrategy}>
+                <SelectTrigger data-testid="select-load-strategy">
+                  <SelectValue placeholder="Select a strategy..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {strategies.map((strategy) => (
+                    <SelectItem key={strategy.id} value={strategy.id} data-testid={`option-strategy-${strategy.id}`}>
+                      {strategy.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button 
               variant="outline" 
               size="sm" 

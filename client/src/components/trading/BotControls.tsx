@@ -1,15 +1,22 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Wifi, AlertTriangle, Wallet } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Play, Pause, Wifi, Wallet, PlugZap, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useBrokerStatus, useRiskConfig } from "@/lib/api";
 
 export function BotControls() {
   const [isActive, setIsActive] = useState(false);
   const [risk, setRisk] = useState([1.5]);
+  const { data: brokerStatus, isLoading: brokerLoading } = useBrokerStatus();
+  const { data: riskConfig, isLoading: riskLoading } = useRiskConfig();
+  const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
 
   return (
     <div className="space-y-4">
@@ -61,6 +68,91 @@ export function BotControls() {
               </div>
               <div className="text-xl font-mono font-bold text-foreground">$10,450</div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Connection & Risk Snapshot */}
+      <Card className="border-border/50 bg-card/30 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="font-display text-md flex items-center gap-2">
+            <PlugZap className="w-4 h-4 text-primary" /> Connection & Risk
+          </CardTitle>
+          <CardDescription>Quick health check for live trading</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-3 rounded border border-border/50 bg-background/40 flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Broker Status</p>
+              {brokerLoading ? (
+                <Skeleton className="h-4 w-32 bg-muted/40" />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Badge variant={isConnected ? "outline" : "secondary"} className={isConnected ? "border-primary/50 text-primary bg-primary/10" : "bg-muted text-muted-foreground"}>
+                    {isConnected ? "Connected" : "Not connected"}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {isConnected ? `Acct #${brokerStatus?.accountNumber}` : "Live feed paused"}
+                  </span>
+                </div>
+              )}
+            </div>
+            {!isConnected && (
+              <Button asChild size="sm" className="h-8">
+                <Link href="/connect">Connect</Link>
+              </Button>
+            )}
+          </div>
+
+          <div className="p-3 rounded border border-border/50 bg-background/40 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-accent" />
+                <p className="text-sm font-medium">Risk Guardrails</p>
+              </div>
+              <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                <Link href="/risk">Edit</Link>
+              </Button>
+            </div>
+            {riskLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="h-10 bg-muted/40" />
+                <Skeleton className="h-10 bg-muted/40" />
+                <Skeleton className="h-10 bg-muted/40" />
+                <Skeleton className="h-10 bg-muted/40" />
+              </div>
+            ) : riskConfig ? (
+              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                <div className="p-2 rounded bg-muted/20 border border-border/40">
+                  <p className="text-muted-foreground uppercase tracking-wide">Daily Loss ($)</p>
+                  <p className="text-foreground font-semibold text-sm">
+                    {riskConfig.maxDailyLossDollar ?? "—"}
+                  </p>
+                </div>
+                <div className="p-2 rounded bg-muted/20 border border-border/40">
+                  <p className="text-muted-foreground uppercase tracking-wide">Daily Loss (%)</p>
+                  <p className="text-foreground font-semibold text-sm">
+                    {riskConfig.maxDailyLossPercent ?? "—"}
+                  </p>
+                </div>
+                <div className="p-2 rounded bg-muted/20 border border-border/40">
+                  <p className="text-muted-foreground uppercase tracking-wide">Max Positions</p>
+                  <p className="text-foreground font-semibold text-sm">
+                    {riskConfig.maxPositionSize ?? "—"}
+                  </p>
+                </div>
+                <div className="p-2 rounded bg-muted/20 border border-border/40">
+                  <p className="text-muted-foreground uppercase tracking-wide">Max Lot Size</p>
+                  <p className="text-foreground font-semibold text-sm">
+                    {riskConfig.maxLotSize ?? "—"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded border border-dashed border-border/50 text-xs text-muted-foreground bg-muted/10">
+                No risk profile set. Configure guardrails before live trading.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

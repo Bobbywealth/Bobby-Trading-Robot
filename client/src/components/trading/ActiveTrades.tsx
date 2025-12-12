@@ -1,11 +1,18 @@
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTrades } from "@/lib/api";
 
 export function ActiveTrades() {
-  const { data: trades = [], isLoading } = useTrades(10);
+  const {
+    data: trades = [],
+    isLoading,
+    error,
+    refetch,
+  } = useTrades(10);
   const openTrades = trades.filter(trade => trade.status === "open");
 
   if (isLoading) {
@@ -21,6 +28,25 @@ export function ActiveTrades() {
     );
   }
 
+  if (error) {
+    return (
+      <Card className="h-full border-border/50 bg-destructive/5 border-destructive/20">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="font-display text-lg text-destructive">Live Positions</CardTitle>
+          <Badge variant="outline" className="border-destructive/40 text-destructive bg-destructive/10">Error</Badge>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 items-start p-6">
+          <p className="text-sm text-destructive/80 font-mono">
+            We couldn&apos;t load your trades. Check connectivity and retry.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => refetch()}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="h-full border-border/50 bg-card/30 backdrop-blur-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -29,8 +55,13 @@ export function ActiveTrades() {
       </CardHeader>
       <CardContent className="p-0">
         {trades.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground font-mono text-sm" data-testid="text-no-trades">
-            No trades yet
+          <div className="p-8 text-center text-muted-foreground font-mono text-sm space-y-3" data-testid="text-no-trades">
+            <p>No trades yet</p>
+            <div className="flex justify-center">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/strategy">Create a strategy to start trading</Link>
+              </Button>
+            </div>
           </div>
         ) : (
           <Table>

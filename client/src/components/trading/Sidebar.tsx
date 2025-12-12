@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Activity, Settings, Terminal, Shield, LogOut, Globe, Code, Plug } from "lucide-react";
+import { LayoutDashboard, Activity, Settings, Terminal, Shield, LogOut, Code, Plug } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBrokerStatus, useDisconnectBroker } from "@/lib/api";
 
@@ -23,15 +23,18 @@ export function Sidebar() {
         <div className="w-8 h-8 rounded bg-primary/20 border border-primary flex items-center justify-center">
           <Activity className="w-5 h-5 text-primary" />
         </div>
-        <span className="font-display font-bold text-xl tracking-wider hidden lg:block text-foreground">
-          TRADELOCKER
-        </span>
+        <div className="hidden lg:flex flex-col">
+          <span className="font-display font-bold text-xl tracking-wider text-foreground leading-tight">
+            TRADELOCKER
+          </span>
+          <span className="text-[10px] text-muted-foreground font-mono">UI v1.1</span>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = location === item.href;
+          const isActive = location === item.href || location.startsWith(`${item.href}/`);
           
           return (
             <Link 
@@ -43,6 +46,8 @@ export function Sidebar() {
                   ? "bg-primary/10 text-primary border border-primary/20 shadow-[0_0_15px_rgba(0,255,128,0.1)]" 
                   : "text-muted-foreground hover:text-foreground hover:bg-white/5"
               )}
+              title={item.label}
+              aria-label={item.label}
             >
               <Icon className={cn("w-5 h-5", isActive && "animate-pulse")} />
               <span className="hidden lg:block font-medium">{item.label}</span>

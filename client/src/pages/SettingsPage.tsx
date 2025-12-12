@@ -6,10 +6,14 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cloud, Server, Cpu, Zap, Bell, Lock, Key } from "lucide-react";
+import { Cloud, Server, Cpu, Zap, Bell, Lock, Key, ShieldCheck } from "lucide-react";
+import { useBrokerStatus } from "@/lib/api";
 import generatedImage from '@assets/generated_images/dark_futuristic_digital_trading_background_with_neon_data_streams.png';
 
 export default function SettingsPage() {
+  const { data: brokerStatus } = useBrokerStatus();
+  const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
+
   return (
     <div className="flex min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/30">
       {/* Background Image Overlay */}
@@ -27,13 +31,26 @@ export default function SettingsPage() {
       </div>
 
       <main className="flex-1 p-4 lg:p-6 overflow-y-auto z-10 relative h-screen">
-        <header className="mb-6">
-          <h1 className="text-2xl font-display font-bold text-foreground tracking-wide flex items-center gap-2">
-            SYSTEM SETTINGS <span className="text-muted-foreground">///</span>
-          </h1>
-          <p className="text-muted-foreground text-sm font-mono">
-            CONFIGURATION & DEPLOYMENT
-          </p>
+        <header className="mb-6 flex flex-col gap-3">
+          <div>
+            <h1 className="text-2xl font-display font-bold text-foreground tracking-wide flex items-center gap-2">
+              SYSTEM SETTINGS <span className="text-muted-foreground">///</span>
+            </h1>
+            <p className="text-muted-foreground text-sm font-mono">
+              CONFIGURATION & DEPLOYMENT
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Badge variant={isConnected ? "outline" : "secondary"} className={isConnected ? "border-primary/40 text-primary bg-primary/10" : "bg-muted text-muted-foreground"}>
+              {isConnected ? `Broker connected • #${brokerStatus?.accountNumber}` : "Broker not connected"}
+            </Badge>
+            <Badge variant="outline" className="border-accent/30 text-accent bg-accent/10 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" /> Secrets encrypted at rest
+            </Badge>
+            <Badge variant="outline" className="border-border/60 text-muted-foreground">
+              Auto-save enabled
+            </Badge>
+          </div>
         </header>
 
         <Tabs defaultValue="hosting" className="max-w-5xl space-y-6">
@@ -82,7 +99,7 @@ export default function SettingsPage() {
                      <Switch defaultChecked />
                    </div>
 
-                   <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-11 font-bold tracking-wide shadow-[0_0_15px_rgba(0,255,128,0.2)]">
+                  <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-11 font-bold tracking-wide shadow-[0_0_15px_rgba(0,255,128,0.2)]">
                      <Zap className="w-4 h-4 mr-2" /> DEPLOY TO CLOUD
                    </Button>
                    <p className="text-[10px] text-center text-muted-foreground">
@@ -92,7 +109,7 @@ export default function SettingsPage() {
                </Card>
 
                {/* Manual Connection Card */}
-               <Card className="border-border/50 bg-card/30 backdrop-blur-sm opacity-60 hover:opacity-100 transition-opacity">
+                   <Card className="border-border/50 bg-card/30 backdrop-blur-sm opacity-60 hover:opacity-100 transition-opacity">
                  <CardHeader>
                    <CardTitle className="flex items-center gap-2 text-muted-foreground">
                      <Server className="w-5 h-5" />
@@ -142,6 +159,12 @@ export default function SettingsPage() {
                     <Input type="password" value="••••••••••••••••" readOnly className="font-mono bg-muted/30" />
                     <Button variant="outline" size="icon"><Lock className="w-4 h-4" /></Button>
                   </div>
+                </div>
+                <div className="p-3 rounded border border-border/50 bg-background/40 text-xs text-muted-foreground flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 mt-0.5 text-accent" />
+                  <span>
+                    Keys are stored server-side and never exposed to the client. Rotate credentials after changing brokers.
+                  </span>
                 </div>
               </CardContent>
             </Card>

@@ -4,14 +4,30 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Download, Trash2, Filter, Terminal } from "lucide-react";
-import { useState } from "react";
+import { Separator } from "@/components/ui/separator";
+import { Search, Download, Filter, Terminal, AlertTriangle } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useSystemLogs } from "@/lib/api";
 import { format } from "date-fns";
+import { Link } from "wouter";
 
 export default function LogsPage() {
   const { data: logs = [], isLoading } = useSystemLogs(100);
   const [searchTerm, setSearchTerm] = useState("");
+  const [levelFilter, setLevelFilter] = useState<"all" | "info" | "warn" | "error">("all");
+
+  const filteredLogs = useMemo(() => {
+    return logs
+      .filter((log) =>
+        levelFilter === "all" ? true : log.level === levelFilter
+      )
+      .filter((log) =>
+        searchTerm === "" ||
+        log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.module.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.level.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+  }, [logs, levelFilter, searchTerm]);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/30">
@@ -52,9 +68,18 @@ export default function LogsPage() {
               />
             </div>
             <div className="flex items-center gap-1 ml-auto">
-              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs font-mono text-muted-foreground hover:text-foreground">
-                <Filter className="w-3 h-3 mr-1" /> FILTER
-              </Button>
+              {(["all","info","warn","error"] as const).map((lvl) => (
+                <Button
+                  key={lvl}
+                  variant={levelFilter === lvl ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 px-2 text-xs font-mono"
+                  onClick={() => setLevelFilter(lvl)}
+                  data-testid={`filter-${lvl}`}
+                >
+                  {lvl.toUpperCase()}
+                </Button>
+              ))}
               <Button variant="ghost" size="sm" className="h-8 px-2 text-xs font-mono text-primary hover:text-primary">
                 <Terminal className="w-3 h-3 mr-1" /> TAIL -F
               </Button>
@@ -66,20 +91,24 @@ export default function LogsPage() {
               <div className="text-center py-8 text-muted-foreground" data-testid="text-loading">
                 Loading logs...
               </div>
-            ) : logs.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground" data-testid="text-no-logs">
-                No logs yet
+            ) : filteredLogs.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground space-y-3" data-testid="text-no-logs">
+                <div className="inline-flex items-center gap-2 px-3 py-2 rounded border border-border/50 bg-background/40">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>No logs match your filters.</span>
+                </div>
+                <div className="flex justify-center gap-3">
+                  <Button size="sm" variant="outline" onClick={() => { setSearchTerm(""); setLevelFilter("all"); }}>
+                    Clear filters
+                  </Button>
+                  <Button asChild size="sm">
+                    <Link href="/">Back to dashboard</Link>
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="space-y-1">
-                {logs
-                  .filter(log => 
-                    searchTerm === "" || 
-                    log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    log.module.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    log.level.toLowerCase().includes(searchTerm.toLowerCase())
-                  )
-                  .map((log) => (
+                {filteredLogs.map((log) => (
                     <div key={log.id} className="flex items-start gap-3 hover:bg-white/5 p-0.5 rounded px-2 group" data-testid={`log-entry-${log.id}`}>
                       <span className="text-muted-foreground opacity-50 w-20 shrink-0" data-testid={`text-timestamp-${log.id}`}>
                         {format(new Date(log.timestamp), 'HH:mm:ss')}

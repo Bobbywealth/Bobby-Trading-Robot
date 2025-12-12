@@ -223,7 +223,10 @@ export async function registerRoutes(
         })),
       });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({
+        error: "Failed to connect broker",
+        details: error?.message,
+      });
     }
   });
 
@@ -256,7 +259,10 @@ export async function registerRoutes(
 
       res.json({ success: true, accountNumber });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({
+        error: "Failed to select account",
+        details: error?.message,
+      });
     }
   });
 
@@ -317,7 +323,10 @@ export async function registerRoutes(
         }))
       );
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        error: "Failed to fetch accounts",
+        details: error?.message,
+      });
     }
   });
 
@@ -342,7 +351,10 @@ export async function registerRoutes(
       const instruments = await tradeLocker.getInstruments();
       res.json(instruments);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        error: "Failed to fetch instruments",
+        details: error?.message,
+      });
     }
   });
 
@@ -369,7 +381,10 @@ export async function registerRoutes(
       const quotes = await tradeLocker.getQuotes(symbols);
       res.json(quotes);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        error: "Failed to fetch quotes",
+        details: error?.message,
+      });
     }
   });
 
@@ -394,7 +409,10 @@ export async function registerRoutes(
       const positions = await tradeLocker.getOpenPositions();
       res.json(positions);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        error: "Failed to fetch positions",
+        details: error?.message,
+      });
     }
   });
 
@@ -431,7 +449,10 @@ export async function registerRoutes(
       const result = await tradeLocker.placeOrder(orderData);
       res.json(result);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({
+        error: "Failed to place order",
+        details: error?.message,
+      });
     }
   });
 
