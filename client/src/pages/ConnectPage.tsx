@@ -67,6 +67,15 @@ export default function ConnectPage() {
     "login",
   );
 
+  const formatNumber = (value: unknown) =>
+    typeof value === "number" ? value.toLocaleString() : "--";
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return "--";
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? "--" : d.toLocaleString();
+  };
+
   const handleConnect = async () => {
     if (!email || !password || !server) {
       toast({
@@ -266,7 +275,7 @@ export default function ConnectPage() {
                     <div className="flex items-center justify-between">
                       <span className="font-medium">Last Connected</span>
                       <span className="font-mono text-sm text-muted-foreground">
-                        {new Date(status.lastConnected).toLocaleString()}
+                        {formatDate(status.lastConnected)}
                       </span>
                     </div>
                   )}
@@ -316,7 +325,7 @@ export default function ConnectPage() {
                             <span className="font-medium">{account.name}</span>
                             <span className="text-muted-foreground">
                               ({account.currency}{" "}
-                              {account.balance.toLocaleString()})
+                              {formatNumber(account.balance)})
                             </span>
                           </div>
                         </SelectItem>
@@ -340,7 +349,7 @@ export default function ConnectPage() {
                             </span>
                             <span className="font-mono">
                               {account.currency}{" "}
-                              {account.balance.toLocaleString()}
+                            {formatNumber(account.balance)}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -349,7 +358,7 @@ export default function ConnectPage() {
                             </span>
                             <span className="font-mono">
                               {account.currency}{" "}
-                              {account.equity.toLocaleString()}
+                            {formatNumber(account.equity)}
                             </span>
                           </div>
                           <div className="flex justify-between">
