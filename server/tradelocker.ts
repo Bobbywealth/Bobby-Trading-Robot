@@ -78,6 +78,63 @@ export class TradeLockerService {
     }
   }
 
+  private async refreshAccessToken(): Promise<void> {
+    if (!this.refreshToken) {
+      throw new Error("Missing refresh token. Please reconnect.");
+    }
+
+    const response = await fetch(`${this.baseUrl}/backend-api/auth/jwt/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        refreshToken: this.refreshToken,
+        server: this.serverName,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Token refresh failed: ${response.status} ${JSON.stringify(errorData)}`,
+      );
+    }
+
+    const data = await response.json();
+    this.accessToken = data.accessToken;
+    this.refreshToken = data.refreshToken ?? this.refreshToken;
+  }
+
+  private async authorizedFetch(
+    input: RequestInfo | URL,
+    init: RequestInit = {},
+    retry = true,
+  ): Promise<Response> {
+    if (!this.accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    const mergedInit: RequestInit = {
+      ...init,
+      headers: {
+        ...(init.headers || {}),
+        Authorization: `Bearer ${this.accessToken}`,
+        Accept: "application/json",
+      },
+    };
+
+    const res = await fetch(input, mergedInit);
+
+    if (res.status === 401 && retry) {
+      await this.refreshAccessToken();
+      return this.authorizedFetch(input, init, false);
+    }
+
+    return res;
+  }
+
   async authenticate(email: string, password: string, server?: string): Promise<AuthResponse> {
     const serverToUse = server || this.serverName;
     
@@ -117,12 +174,8 @@ export class TradeLockerService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/backend-api/auth/jwt/all-accounts`, {
+      const response = await this.authorizedFetch(`${this.baseUrl}/backend-api/auth/jwt/all-accounts`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-          "Accept": "application/json",
-        },
       });
 
       if (!response.ok) {
@@ -142,13 +195,11 @@ export class TradeLockerService {
     }
 
     try {
-      const response = await fetch(
+      const response = await this.authorizedFetch(
         `${this.baseUrl}/backend-api/trade/accounts/${this.accNum}/instruments`,
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-            "Accept": "application/json",
             accNum: String(this.accNum),
             accountNumber: String(this.accNum),
             "Account-Number": String(this.accNum),
@@ -176,13 +227,11 @@ export class TradeLockerService {
       const quotes: Quote[] = [];
       
       for (const symbol of symbols) {
-        const response = await fetch(
+        const response = await this.authorizedFetch(
           `${this.baseUrl}/backend-api/trade/accounts/${this.accNum}/quotes/${symbol}`,
           {
             method: "GET",
             headers: {
-              Authorization: `Bearer ${this.accessToken}`,
-              "Accept": "application/json",
               accNum: String(this.accNum),
               accountNumber: String(this.accNum),
               "Account-Number": String(this.accNum),
@@ -225,13 +274,11 @@ export class TradeLockerService {
     }
 
     try {
-      const response = await fetch(
+      const response = await this.authorizedFetch(
         `${this.baseUrl}/backend-api/trade/accounts/${this.accNum}/positions`,
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-            "Accept": "application/json",
             accNum: String(this.accNum),
             accountNumber: String(this.accNum),
             "Account-Number": String(this.accNum),
@@ -256,14 +303,12 @@ export class TradeLockerService {
     }
 
     try {
-      const response = await fetch(
+      const response = await this.authorizedFetch(
         `${this.baseUrl}/backend-api/trade/accounts/${this.accNum}/orders`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
             "Content-Type": "application/json",
-            "Accept": "application/json",
             accNum: String(this.accNum),
             accountNumber: String(this.accNum),
             "Account-Number": String(this.accNum),

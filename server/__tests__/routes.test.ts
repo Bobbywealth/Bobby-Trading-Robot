@@ -335,7 +335,9 @@ describe("registerRoutes", () => {
       lastConnected: new Date(),
     });
 
-    await request(app).get("/api/broker/quotes").expect(409);
+    const quotesRes = await request(app).get("/api/broker/quotes").expect(200);
+    expect(Array.isArray(quotesRes.body)).toBe(true);
+    expect(quotesRes.body[0]).toMatchObject({ source: "mock", reason: "no_account_selected" });
   });
 
   it("blocks order when outside trading window or size exceeds limits", async () => {
