@@ -19,50 +19,29 @@ const sslEnabled =
 
 function parseDatabaseUrl(raw: string): PoolConfig {
   const normalized = raw.trim();
-  // Ensure protocol for WHATWG URL parsing
-  const withProtocol =
-    normalized.startsWith("postgres://") || normalized.startsWith("postgresql://")
-      ? normalized
-      : `postgres://${normalized}`;
+  const match = normalized.match(
+    /^postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?\/([^?]+)/i,
+  );
 
-  // Try WHATWG URL first; if not supported by scheme, fall back to manual parse.
-  try {
-    const url = new URL(withProtocol);
-    return {
-      host: url.hostname,
-      port: url.port ? Number(url.port) : 5432,
-      user: decodeURIComponent(url.username),
-      password: decodeURIComponent(url.password),
-      database: url.pathname.replace(/^\//, ""),
-      ssl: sslEnabled
-        ? {
-            rejectUnauthorized: false,
-          }
-        : undefined,
-    };
-  } catch {
-    // Manual fallback: postgres://user:pass@host:port/db?...
-    const match = withProtocol.match(
-      /^postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?\/([^?]+)/i,
-    );
-    if (!match) {
-      console.error("[db] Invalid DATABASE_URL format. Expected postgres://user:pass@host:port/db?sslmode=require");
-      throw new Error("Invalid DATABASE_URL format");
-    }
-    const [, user, password, host, port, database] = match;
-    return {
-      host,
-      port: port ? Number(port) : 5432,
-      user: decodeURIComponent(user),
-      password: decodeURIComponent(password),
-      database,
-      ssl: sslEnabled
-        ? {
-            rejectUnauthorized: false,
-          }
-        : undefined,
-    };
+  if (!match) {
+    console.error("[db] Invalid DATABASE_URL format. Expected postgres://user:pass@host:port/db?sslmode=require");
+    throw new Error("Invalid DATABASE_URL format");
   }
+
+  const [, user, password, host, port, database] = match;
+
+  return {
+    host,
+    port: port ? Number(port) : 5432,
+    user: decodeURIComponent(user),
+    password: decodeURIComponent(password),
+    database,
+    ssl: sslEnabled
+      ? {
+          rejectUnauthorized: false,
+        }
+      : undefined,
+  };
 }
 
 const pool = new Pool(parseDatabaseUrl(process.env.DATABASE_URL!));
