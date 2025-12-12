@@ -24,9 +24,11 @@ export function QuickTrade() {
 
   const { data: instruments = [], isLoading: instrumentsLoading } = useBrokerInstruments(isConnected);
 
+  const safeInstruments = Array.isArray(instruments) ? instruments : [];
+
   const selectedInstrument = useMemo(
-    () => instruments.find((i) => i.tradableInstrumentId === selectedInstrumentId),
-    [instruments, selectedInstrumentId],
+    () => safeInstruments.find((i) => i.tradableInstrumentId === selectedInstrumentId),
+    [safeInstruments, selectedInstrumentId],
   );
 
   const { data: quotes } = useBrokerQuotes(
@@ -85,20 +87,20 @@ export function QuickTrade() {
           <Select
             value={selectedInstrumentId ? String(selectedInstrumentId) : ""}
             onValueChange={(v) => setSelectedInstrumentId(Number(v))}
-            disabled={!isConnected || instrumentsLoading || instruments.length === 0}
+            disabled={!isConnected || instrumentsLoading || safeInstruments.length === 0}
           >
             <SelectTrigger data-testid="select-instrument">
               <SelectValue placeholder={isConnected ? "Choose instrument" : "Connect first"} />
             </SelectTrigger>
             <SelectContent>
-              {instruments.map((inst) => (
+              {safeInstruments.map((inst) => (
                 <SelectItem key={inst.tradableInstrumentId} value={String(inst.tradableInstrumentId)}>
                   {inst.name} {inst.description ? `— ${inst.description}` : ""}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {instruments.length === 0 && isConnected && !instrumentsLoading && (
+          {safeInstruments.length === 0 && isConnected && !instrumentsLoading && (
             <p className="text-xs text-muted-foreground">No instruments returned from broker.</p>
           )}
         </div>
@@ -151,3 +153,4 @@ export function QuickTrade() {
     </Card>
   );
 }
+

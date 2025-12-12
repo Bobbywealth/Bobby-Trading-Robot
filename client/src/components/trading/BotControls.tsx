@@ -55,7 +55,7 @@ export function BotControls() {
   const instrumentsQuery = useBrokerInstruments(Boolean(isConnected));
   const instruments = Array.isArray(instrumentsQuery.data) ? instrumentsQuery.data : [];
 
-  const selectedInstrument = instrumentsQuery.data?.find(
+  const selectedInstrument = instruments.find(
     (i) => i.tradableInstrumentId === instrumentId,
   );
   const quoteSymbols = selectedInstrument ? [selectedInstrument.name] : [];

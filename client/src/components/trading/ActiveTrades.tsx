@@ -13,7 +13,7 @@ export function ActiveTrades() {
     refetch,
   } = useBrokerPositions();
 
-  const openPositions = positions || [];
+  const openPositions = Array.isArray(positions) ? positions : [];
 
   if (isLoading) {
     return (
