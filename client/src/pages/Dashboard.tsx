@@ -5,12 +5,19 @@ import { ActiveTrades } from "@/components/trading/ActiveTrades";
 import { BotControls } from "@/components/trading/BotControls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useBrokerStatus } from "@/lib/api";
+import { useBrokerStatus, useBrokerAccounts } from "@/lib/api";
 import generatedImage from '@assets/generated_images/dark_futuristic_digital_trading_background_with_neon_data_streams.png';
 
 export default function Dashboard() {
   const { data: status } = useBrokerStatus();
   const isConnected = status?.connected && status?.accountNumber;
+  const { data: accounts } = useBrokerAccounts(Boolean(isConnected));
+
+  const accountSummary = accounts?.find((a) =>
+    String(a.accNum ?? a.id ?? a.accountNumber) === String(status?.accountNumber),
+  );
+  const balance = accountSummary?.balance ?? accountSummary?.accountBalance;
+  const equity = accountSummary?.equity ?? accountSummary?.accountEquity;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/30">
@@ -51,8 +58,16 @@ export default function Dashboard() {
             </div>
             <div className="h-8 w-[1px] bg-border/50 mx-2" />
             <div className="text-right">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Daily Gain</div>
-              <div className="text-xl font-mono font-bold text-accent glow-text-accent">+2.4%</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Balance</div>
+              <div className="text-lg font-mono font-bold text-foreground">
+                {balance != null ? balance.toLocaleString() : "--"}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Equity</div>
+              <div className="text-lg font-mono font-bold text-accent glow-text-accent">
+                {equity != null ? equity.toLocaleString() : "--"}
+              </div>
             </div>
             {!isConnected && (
               <Button asChild size="sm" className="bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,255,128,0.15)]">

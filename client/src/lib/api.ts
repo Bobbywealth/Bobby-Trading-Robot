@@ -248,10 +248,10 @@ export function useDisconnectBroker() {
   });
 }
 
-export function useBrokerAccounts() {
+export function useBrokerAccounts(enabled = false) {
   return useQuery<BrokerAccount[]>({
     queryKey: ["/api/broker/accounts"],
-    enabled: false,
+    enabled,
   });
 }
 
