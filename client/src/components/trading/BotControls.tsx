@@ -62,12 +62,6 @@ export function BotControls() {
               </div>
               <div className="text-xl font-mono font-bold text-primary">12ms</div>
             </div>
-            <div className="p-3 rounded bg-background/50 border border-border/50">
-              <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                <Wallet className="w-3 h-3" /> Balance
-              </div>
-              <div className="text-xl font-mono font-bold text-foreground">$10,450</div>
-            </div>
           </div>
         </CardContent>
       </Card>
