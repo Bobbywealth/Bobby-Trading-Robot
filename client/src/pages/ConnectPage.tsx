@@ -127,7 +127,7 @@ export default function ConnectPage() {
     try {
       await selectAccountMutation.mutateAsync({
         accountId: String(account.id),
-        accountNumber: account.accNum,
+        accountNumber: Number(account.accNum),
       });
       setStep("connected");
       toast({

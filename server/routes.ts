@@ -37,6 +37,9 @@ export async function registerRoutes(
 ): Promise<Server> {
   const MOCK_USER_ID = "00000000-0000-0000-0000-000000000001";
 
+  // Ensure the mock user exists to satisfy FK constraints when storing credentials.
+  await storage.ensureUser(MOCK_USER_ID);
+
   app.post("/api/strategies", async (req, res) => {
     try {
       const validatedData = insertStrategySchema.parse({
@@ -254,7 +257,7 @@ export async function registerRoutes(
       const { accountId, accountNumber } = z
         .object({
           accountId: z.string(),
-          accountNumber: z.number(),
+          accountNumber: z.coerce.number(),
         })
         .parse(req.body);
 
