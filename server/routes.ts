@@ -276,7 +276,8 @@ export async function registerRoutes(
         credential.server,
         credential.accessToken,
         credential.refreshToken!,
-        accountNumber
+        accountNumber,
+        accountId
       );
 
       res.json({ success: true, accountNumber });
@@ -367,7 +368,8 @@ export async function registerRoutes(
         credential.server,
         credential.accessToken,
         credential.refreshToken!,
-        credential.accountNumber
+        credential.accountNumber,
+        credential.accountId
       );
 
       const instruments = await tradeLocker.getInstruments();
@@ -412,7 +414,8 @@ export async function registerRoutes(
         credential.server,
         credential.accessToken,
         credential.refreshToken!,
-        credential.accountNumber
+        credential.accountNumber,
+        credential.accountId
       );
 
       const quotes = await tradeLocker.getQuotes(symbols);
@@ -440,7 +443,8 @@ export async function registerRoutes(
         credential.server,
         credential.accessToken,
         credential.refreshToken!,
-        credential.accountNumber
+        credential.accountNumber,
+        credential.accountId
       );
 
       const positions = await tradeLocker.getOpenPositions();
@@ -498,7 +502,8 @@ export async function registerRoutes(
         credential.server,
         credential.accessToken,
         credential.refreshToken!,
-        credential.accountNumber
+        credential.accountNumber,
+        credential.accountId
       );
 
       const result = await tradeLocker.placeOrder(orderData);
