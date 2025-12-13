@@ -270,7 +270,11 @@ export class TradeLockerService {
         throw new Error(`Failed to get accounts: ${response.status}`);
       }
 
-      const data: AccountsResponse = await response.json();
+      const data: any = await response.json();
+      // Handle wrapped response: {s:"ok", d:{accounts:[...]}}
+      if (data.d && Array.isArray(data.d.accounts)) {
+        return data.d.accounts;
+      }
       return data.accounts || [];
     } catch (error: any) {
       throw new Error(`Failed to get accounts: ${error.message}`);
@@ -293,6 +297,10 @@ export class TradeLockerService {
       }
 
       const data = await response.json();
+      // Handle wrapped response: {s:"ok", d:{instruments:[...]}}
+      if (data.d && Array.isArray(data.d.instruments)) {
+        return data.d.instruments;
+      }
       return data.instruments || data || [];
     } catch (error: any) {
       throw new Error(`Failed to get instruments: ${error.message}`);
@@ -332,7 +340,14 @@ export class TradeLockerService {
         }
 
         const data = await response.json();
-        const arr = Array.isArray(data) ? data : [data];
+        
+        // Handle wrapped response: {s:"ok", d:{quotes:[...]}} or {s:"ok", d:{quote:{...}}}
+        let unwrapped = data;
+        if (data.d) {
+          unwrapped = data.d.quotes || data.d.quote || data.d;
+        }
+        
+        const arr = Array.isArray(unwrapped) ? unwrapped : [unwrapped];
         const parsed = arr
           .map((item: any) => {
             const s = item.s ?? item.symbol ?? symbol;
@@ -368,6 +383,10 @@ export class TradeLockerService {
       }
 
       const data = await response.json();
+      // Handle wrapped response: {s:"ok", d:{positions:[...]}}
+      if (data.d && Array.isArray(data.d.positions)) {
+        return data.d.positions;
+      }
       return data.positions || data || [];
     } catch (error: any) {
       throw new Error(`Failed to get positions: ${error.message}`);
@@ -400,10 +419,12 @@ export class TradeLockerService {
       }
 
       const data = await response.json();
+      // Handle wrapped response: {s:"ok", d:{order:{...}}}
+      const unwrapped = data.d?.order || data.d || data;
       return {
-        orderId: data.orderId || data.id,
-        status: data.status || "submitted",
-        message: data.message,
+        orderId: unwrapped.orderId || unwrapped.id,
+        status: unwrapped.status || "submitted",
+        message: unwrapped.message,
       };
     } catch (error: any) {
       throw new Error(`Failed to place order: ${error.message}`);
