@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useState } from "react";
 import { Sidebar } from "@/components/trading/Sidebar";
 import { MarketChart } from "@/components/trading/MarketChart";
 import { ActiveTrades } from "@/components/trading/ActiveTrades";
@@ -12,6 +13,7 @@ import generatedImage from '@assets/generated_images/dark_futuristic_digital_tra
 const LOGO_URL = "https://iili.io/f7qxA7f.png";
 
 export default function Dashboard() {
+  const [showPositions, setShowPositions] = useState(false);
   const { data: status } = useBrokerStatus();
   const isConnected = status?.connected && status?.accountNumber;
   const { data: accounts } = useBrokerAccounts(Boolean(isConnected));
@@ -90,23 +92,36 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] min-h-[600px]">
-          {/* Left Column - Charts & Tables */}
-          <div className="lg:col-span-8 flex flex-col gap-6 h-full">
-            <div className="flex-1 min-h-[300px]">
-              <MarketChart />
-            </div>
-            <div className="flex-1 min-h-[250px]">
-              <ActiveTrades />
-            </div>
-          </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] min-h-[600px]">
+              {/* Left Column - Chart & (optional) Positions */}
+              <div className="lg:col-span-8 flex flex-col gap-4 h-full">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground font-mono">Chart</div>
+                  <button
+                    onClick={() => setShowPositions((v) => !v)}
+                    className="text-xs px-3 py-1 rounded border border-border/50 hover:border-primary/50 hover:text-primary transition-colors"
+                  >
+                    {showPositions ? "Hide Positions" : "Show Positions"}
+                  </button>
+                </div>
 
-          {/* Right Column - Controls */}
-          <div className="lg:col-span-4 h-full overflow-y-auto pb-6 space-y-4">
-            <QuickTrade />
-            <BotControls />
-          </div>
-        </div>
+                <div className="flex-1 min-h-[360px]">
+                  <MarketChart />
+                </div>
+
+                {showPositions && (
+                  <div className="min-h-[220px]">
+                    <ActiveTrades />
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column - Controls */}
+              <div className="lg:col-span-4 h-full overflow-y-auto pb-6 space-y-4">
+                <QuickTrade />
+                <BotControls />
+              </div>
+            </div>
       </main>
     </div>
   );
