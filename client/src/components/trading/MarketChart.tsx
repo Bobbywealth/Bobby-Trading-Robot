@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   createChart,
@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, EyeOff, Maximize2, Wifi, WifiOff, TrendingUp, PlugZap } from "lucide-react";
-import { useBrokerStatus, useBrokerQuotes } from "@/lib/api";
+import { useBrokerStatus, useBrokerQuotes, useBrokerInstruments } from "@/lib/api";
 
 const TIMEFRAMES = {
   "1m": 60_000,
@@ -37,8 +37,8 @@ type Candle = {
 };
 
 // Generate realistic candlestick data for a given interval
-const generateData = (count: number, intervalMs: number): Candle[] => {
-  let price = 2035.0;
+const generateData = (count: number, intervalMs: number, startPrice = 2035): Candle[] => {
+  let price = startPrice;
   const data: Candle[] = [];
   const time = Math.floor(new Date("2023-01-01").getTime() / 1000);
 
@@ -137,13 +137,27 @@ export function MarketChart() {
   const { data: brokerStatus, isLoading: isStatusLoading } = useBrokerStatus();
   const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
 
+  const { data: instruments = [] } = useBrokerInstruments(Boolean(isConnected));
+  const safeInstruments = useMemo(
+    () => (Array.isArray(instruments) ? instruments : []) as Array<{ tradableInstrumentId: number; name: string }>,
+    [instruments],
+  );
+
+  const [symbol, setSymbol] = useState<string>("XAUUSD");
+
+  useEffect(() => {
+    if (safeInstruments.length > 0) {
+      setSymbol((prev) => prev || safeInstruments[0].name);
+    }
+  }, [safeInstruments]);
+
   const {
     data: liveQuotes,
     isLoading: quotesLoading,
     error: quotesError,
     isError: isQuotesError,
     refetch: refetchQuotes,
-  } = useBrokerQuotes(isConnected ? ["XAUUSD"] : []);
+  } = useBrokerQuotes(isConnected && symbol ? [symbol] : []);
   const livePrice = liveQuotes?.[0];
 
   // Initialize chart shell and series
@@ -208,7 +222,8 @@ export function MarketChart() {
     if (!candleSeries || !fastEmaSeries || !slowEmaSeries) return;
 
     const intervalMs = TIMEFRAMES[timeframe];
-    const initialData = generateData(200, intervalMs);
+    const initialPrice = livePrice?.ask ?? livePrice?.bid ?? 2035;
+    const initialData = generateData(200, intervalMs, initialPrice);
     candleDataRef.current = initialData;
     candleSeries.setData(initialData);
 
@@ -271,7 +286,7 @@ export function MarketChart() {
       : [];
 
     setChartReady(true);
-  }, [timeframe, candleSeries, fastEmaSeries, slowEmaSeries, showLevels]);
+  }, [timeframe, candleSeries, fastEmaSeries, slowEmaSeries, showLevels, livePrice]);
 
   // Toggle Strategy Visibility
   useEffect(() => {
@@ -371,7 +386,7 @@ export function MarketChart() {
       <CardHeader className="flex flex-row items-center justify-between pb-2 shrink-0 border-b border-border/20 bg-card/50">
         <div className="space-y-1">
           <CardTitle className="font-display text-lg flex items-center gap-2">
-            XAUUSD <span className="text-muted-foreground font-sans text-sm font-normal">Gold vs US Dollar</span>
+            {symbol} <span className="text-muted-foreground font-sans text-sm font-normal">Live price</span>
             {isConnected ? (
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs ml-2">
                 <Wifi className="w-3 h-3 mr-1" />
@@ -384,7 +399,7 @@ export function MarketChart() {
               </Badge>
             )}
           </CardTitle>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-2xl font-mono font-bold text-foreground" data-testid="text-price">
                 {displayPrice}
@@ -397,9 +412,6 @@ export function MarketChart() {
                   <span className="text-destructive">{livePrice.ask.toFixed(2)}</span>
                 </div>
               )}
-              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-mono">
-                +0.45%
-              </Badge>
             </div>
             {showStrategy && (
               <div className="flex items-center gap-3 text-xs animate-in fade-in">
@@ -427,7 +439,19 @@ export function MarketChart() {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <Select value={symbol} onValueChange={setSymbol} disabled={!isConnected || safeInstruments.length === 0}>
+            <SelectTrigger className="w-[140px] h-8 bg-background/50 border-border/50">
+              <SelectValue placeholder="Symbol" />
+            </SelectTrigger>
+            <SelectContent>
+              {safeInstruments.map((inst) => (
+                <SelectItem key={inst.tradableInstrumentId} value={inst.name}>
+                  {inst.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="icon"
