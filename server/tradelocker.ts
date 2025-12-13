@@ -309,33 +309,41 @@ export class TradeLockerService {
       const now = Date.now();
 
       for (const symbol of symbols) {
-        const response = await this.fetchWithAccount(
+        // First try per-symbol path
+        let response = await this.fetchWithAccount(
           (ref) => `${this.baseUrl}/backend-api/trade/accounts/${ref}/quotes/${encodeURIComponent(symbol)}`,
           "GET",
         );
 
+        // If not found, retry query endpoint
+        if (response.status === 404) {
+          response = await this.fetchWithAccount(
+            (ref) =>
+              `${this.baseUrl}/backend-api/trade/accounts/${ref}/quotes?symbols=${encodeURIComponent(symbol)}`,
+            "GET",
+          );
+        }
+
         if (!response.ok) {
           const text = await response.text().catch(() => "");
           throw new Error(
-            `Quote request failed for ${symbol}: ${response.status} ${response.statusText} ${text}`.trim()
+            `Quote request failed for ${symbol}: ${response.status} ${response.statusText} ${text}`.trim(),
           );
         }
 
         const data = await response.json();
-        const bid = data.bid ?? data.b;
-        const ask = data.ask ?? data.a;
-        const s = data.s ?? data.symbol ?? symbol;
+        const arr = Array.isArray(data) ? data : [data];
+        const parsed = arr
+          .map((item: any) => {
+            const s = item.s ?? item.symbol ?? symbol;
+            const bid = item.bid ?? item.b;
+            const ask = item.ask ?? item.a;
+            if (typeof bid !== "number" || typeof ask !== "number") return null;
+            return { s, bid, ask, timestamp: now };
+          })
+          .filter(Boolean) as Quote[];
 
-        if (typeof bid !== "number" || typeof ask !== "number") {
-          throw new Error(`Quote payload missing bid/ask for ${symbol}: ${JSON.stringify(data)}`);
-        }
-
-        quotes.push({
-          s,
-          bid,
-          ask,
-          timestamp: now,
-        });
+        quotes.push(...parsed);
       }
 
       return quotes;
