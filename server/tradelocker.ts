@@ -316,45 +316,61 @@ export class TradeLockerService {
       const quotes: Quote[] = [];
       const now = Date.now();
 
-      // Try global quotes endpoint (no account needed)
+      // Try multiple endpoint patterns for quotes
+      const endpointPatterns = [
+        // Pattern 1: tradableInstrumentId-based (if we have instrument mapping)
+        (symbol: string) => `${this.baseUrl}/backend-api/prices/${symbol}`,
+        // Pattern 2: global prices/instruments
+        (symbol: string) => `${this.baseUrl}/backend-api/prices/instruments?symbols=${encodeURIComponent(symbol)}`,
+        // Pattern 3: quotes by symbol name
+        (symbol: string) => `${this.baseUrl}/backend-api/quotes/${encodeURIComponent(symbol)}`,
+        // Pattern 4: simple /api/quotes
+        (symbol: string) => `${this.baseUrl}/api/quotes/${encodeURIComponent(symbol)}`,
+      ];
+
       for (const symbol of symbols) {
-        try {
-          const response = await this.authorizedFetch(
-            `${this.baseUrl}/backend-api/prices/instruments?symbols=${encodeURIComponent(symbol)}`,
-            {
+        let found = false;
+        
+        for (const buildUrl of endpointPatterns) {
+          try {
+            const response = await this.authorizedFetch(buildUrl(symbol), {
               method: "GET",
               headers: {},
+            });
+
+            if (!response.ok) continue;
+
+            const data = await response.json();
+            
+            // Handle wrapped response: {s:"ok", d:{quotes:[...]}} or {s:"ok", d:{quote:{...}}}
+            let unwrapped = data;
+            if (data.d) {
+              unwrapped = data.d.quotes || data.d.quote || data.d.prices || data.d;
             }
-          );
+            
+            const arr = Array.isArray(unwrapped) ? unwrapped : [unwrapped];
+            const parsed = arr
+              .map((item: any) => {
+                const s = item.s ?? item.symbol ?? item.name ?? symbol;
+                const bid = item.bid ?? item.b ?? item.bidPrice;
+                const ask = item.ask ?? item.a ?? item.askPrice;
+                if (typeof bid !== "number" || typeof ask !== "number") return null;
+                return { s, bid, ask, timestamp: now };
+              })
+              .filter(Boolean) as Quote[];
 
-          if (!response.ok) {
-            console.warn(`Quote unavailable for ${symbol}: ${response.status}`);
-            continue;
+            if (parsed.length > 0) {
+              quotes.push(...parsed);
+              found = true;
+              break; // Found working endpoint for this symbol
+            }
+          } catch (err) {
+            continue; // Try next pattern
           }
-
-          const data = await response.json();
-          
-          // Handle wrapped response: {s:"ok", d:{quotes:[...]}} or {s:"ok", d:{quote:{...}}}
-          let unwrapped = data;
-          if (data.d) {
-            unwrapped = data.d.quotes || data.d.quote || data.d.prices || data.d;
-          }
-          
-          const arr = Array.isArray(unwrapped) ? unwrapped : [unwrapped];
-          const parsed = arr
-            .map((item: any) => {
-              const s = item.s ?? item.symbol ?? item.name ?? symbol;
-              const bid = item.bid ?? item.b ?? item.bidPrice;
-              const ask = item.ask ?? item.a ?? item.askPrice;
-              if (typeof bid !== "number" || typeof ask !== "number") return null;
-              return { s, bid, ask, timestamp: now };
-            })
-            .filter(Boolean) as Quote[];
-
-          quotes.push(...parsed);
-        } catch (err) {
-          console.warn(`Failed to fetch quote for ${symbol}:`, err);
-          continue;
+        }
+        
+        if (!found) {
+          console.warn(`No quotes endpoint worked for ${symbol}`);
         }
       }
 
