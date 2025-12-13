@@ -337,19 +337,39 @@ export class TradeLockerService {
         }
 
         try {
-          // Use the documented /trade/quotes endpoint with routeId
-          const response = await this.authorizedFetch(
-            `${this.baseUrl}/backend-api/trade/quotes?routeId=${instrument.infoRouteId}&tradableInstrumentId=${instrument.id}`,
-            {
+          const headerAcc = this.getHeaderAccountNumber() ?? this.getPrimaryAccountRef();
+          const headers: Record<string, string> = {};
+          if (headerAcc) {
+            headers.accNum = String(headerAcc);
+            headers.accountNumber = String(headerAcc);
+          }
+
+          // Try multiple quote endpoint formats with routeId
+          const url1 = `${this.baseUrl}/backend-api/trade/instruments/${instrument.id}?routeId=${instrument.infoRouteId}`;
+          console.log(`[TradeLocker] Trying quotes endpoint 1: ${url1}`);
+          
+          let response = await this.authorizedFetch(url1, {
+            method: "GET",
+            headers,
+          });
+
+          // If 404, try alternate format
+          if (response.status === 404) {
+            const url2 = `${this.baseUrl}/backend-api/trade/quotes?routeId=${instrument.infoRouteId}&tradableInstrumentId=${instrument.id}`;
+            console.log(`[TradeLocker] Endpoint 1 404, trying endpoint 2: ${url2}`);
+            response = await this.authorizedFetch(url2, {
               method: "GET",
-              headers: {},
-            }
-          );
+              headers,
+            });
+          }
 
           if (!response.ok) {
-            console.warn(`Quote request failed for ${symbol}: ${response.status}`);
+            const text = await response.text().catch(() => "");
+            console.warn(`[TradeLocker] Quote failed for ${symbol}: ${response.status} ${text.substring(0, 200)}`);
             continue;
           }
+          
+          console.log(`[TradeLocker] Quote success for ${symbol}: ${response.status}`);
 
           const data = await response.json();
           
