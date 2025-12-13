@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, MOCK_USER_ID } from "./storage";
 import { createTradeLockerService, getTradeLockerService, clearTradeLockerService, initializeTradeLockerService } from "./tradelocker";
+import { strategyRunner } from "./strategy-runner";
 import {
   insertStrategySchema,
   insertRiskConfigSchema,
@@ -508,6 +509,44 @@ export async function registerRoutes(
         details: error?.message,
       });
     }
+  });
+
+  // Strategy runner controls
+  app.post("/api/strategies/:id/activate", async (req, res) => {
+    try {
+      const strategyId = req.params.id;
+      const { dryRun } = z.object({ dryRun: z.boolean().optional() }).parse(req.body ?? {});
+
+      // mark active in DB for visibility (best-effort)
+      await storage.updateStrategy(strategyId, { isActive: true });
+
+      await strategyRunner.start(strategyId, { dryRun: dryRun ?? true });
+      res.json({ success: true, strategyId, status: strategyRunner.status() });
+    } catch (error: any) {
+      res.status(400).json({
+        error: "Failed to activate strategy",
+        details: error?.message,
+      });
+    }
+  });
+
+  app.post("/api/strategies/stop", async (_req, res) => {
+    try {
+      await strategyRunner.stop();
+      // best-effort: mark all inactive for the mock user
+      const strategies = await storage.getStrategies(MOCK_USER_ID);
+      await Promise.all(strategies.map((s) => storage.updateStrategy(s.id, { isActive: false })));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({
+        error: "Failed to stop strategy",
+        details: error?.message,
+      });
+    }
+  });
+
+  app.get("/api/strategies/active", async (_req, res) => {
+    res.json(strategyRunner.status());
   });
 
   return httpServer;

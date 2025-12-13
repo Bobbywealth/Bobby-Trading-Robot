@@ -21,80 +21,40 @@ import { useStrategies, useCreateStrategy, useUpdateStrategy } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const TEMPLATES = {
-  ema_crossover: `def on_tick(data, account):
-    # EMA Crossover Strategy
-    # A simple trend-following strategy using two Exponential Moving Averages
-    
-    fast_period = 9
-    slow_period = 21
-    
-    ema_fast = indicators.ema(data.close, fast_period)
-    ema_slow = indicators.ema(data.close, slow_period)
-    
-    current_price = data.close[-1]
-    
-    # Check for crossover
-    if ema_fast[-1] > ema_slow[-1] and ema_fast[-2] <= ema_slow[-2]:
-        if not position.is_open:
-            trade.buy(
-                symbol=data.symbol,
-                volume=0.1,
-                sl=current_price - 20 * data.point,
-                tp=current_price + 40 * data.point
-            )
-            log.info(f"Bullish Crossover: Bought {data.symbol}")
-            
-    elif ema_fast[-1] < ema_slow[-1] and ema_fast[-2] >= ema_slow[-2]:
-        if position.is_long:
-            trade.close_all()
-            log.info("Bearish Crossover: Closed Longs")`,
-            
-  rsi_reversal: `def on_tick(data, account):
-    # RSI Mean Reversal
-    # Buys when oversold (<30) and Sells when overbought (>70)
-    
-    rsi_period = 14
-    rsi_val = indicators.rsi(data.close, rsi_period)
-    current_rsi = rsi_val[-1]
-    current_price = data.close[-1]
-    
-    if current_rsi < 30 and not position.is_open:
-        # Oversold condition
-        trade.buy(
-            symbol=data.symbol,
-            volume=0.1,
-            sl=current_price * 0.99, # 1% Stop Loss
-            tp=current_price * 1.02  # 2% Take Profit
-        )
-        log.info(f"RSI Oversold ({current_rsi:.1f}): Buy Signal")
-        
-    elif current_rsi > 70 and position.is_long:
-        # Overbought condition
-        trade.close_all()
-        log.info(f"RSI Overbought ({current_rsi:.1f}): Closing Positions")`,
-        
-  bollinger_breakout: `def on_tick(data, account):
-    # Bollinger Bands Breakout
-    # Trades when price breaks outside the volatility bands
-    
-    period = 20
-    std_dev = 2.0
-    
-    upper, middle, lower = indicators.bbands(data.close, period, std_dev)
-    current_price = data.close[-1]
-    
-    # Expansion logic: Bandwidth increasing
-    bandwidth = (upper[-1] - lower[-1]) / middle[-1]
-    
-    if current_price > upper[-1] and bandwidth > 0.002:
-        if not position.is_open:
-            trade.buy(symbol=data.symbol, volume=0.1)
-            log.info("Upper BB Breakout: Long Entry")
-            
-    elif current_price < middle[-1] and position.is_long:
-        # Close when price returns to mean
-        trade.close_all()
-        log.info("Price returned to mean: Exit")`
+  ema_crossover: `// JS strategy template for the live runner
+// Must export onTick(ctx). ctx contains:
+// ctx.quotes: { XAUUSD: { bid, ask, mid, timestamp } }
+// ctx.placeOrder(order): side: "buy" | "sell", type: "market" | "limit" | "stop"
+// ctx.log: info/error; ctx.riskConfig; ctx.account
+
+function ema(values, period) {
+  const k = 2 / (period + 1);
+  let emaVal = values[0] ?? 0;
+  const out = [];
+  for (const v of values) {
+    emaVal = v * k + emaVal * (1 - k);
+    out.push(emaVal);
+  }
+  return out;
+}
+
+module.exports.onTick = async function (ctx) {
+  const q = ctx.quotes.XAUUSD;
+  if (!q) return;
+
+  // Example: simple crossover on mid price using last 30 mids
+  // (In live mode we only see latest tick; adapt as needed)
+  const price = q.mid;
+  ctx.log.info(\`Tick mid=\${price.toFixed(2)}\`);
+
+  // To place real orders, disable dryRun when activating and set a valid instrumentId.
+  // ctx.placeOrder({
+  //   instrumentId: 1, // replace with real instrument id from /api/broker/instruments
+  //   qty: 0.01,
+  //   side: "buy",
+  //   type: "market",
+  // });
+};`,
 };
 
 export function StrategyEditor() {
