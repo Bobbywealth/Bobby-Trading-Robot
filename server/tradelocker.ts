@@ -308,62 +308,61 @@ export class TradeLockerService {
   }
 
   async getQuotes(symbols: string[]): Promise<Quote[]> {
-    if (!this.accessToken || !this.accountNumberRef) {
-      throw new Error("Not authenticated or no account selected");
+    if (!this.accessToken) {
+      throw new Error("Not authenticated");
     }
 
     try {
       const quotes: Quote[] = [];
       const now = Date.now();
 
+      // Try global quotes endpoint (no account needed)
       for (const symbol of symbols) {
-        // First try per-symbol path
-        let response = await this.fetchWithAccount(
-          (ref) => `${this.baseUrl}/backend-api/trade/accounts/${ref}/quotes/${encodeURIComponent(symbol)}`,
-          "GET",
-        );
-
-        // If not found, retry query endpoint
-        if (response.status === 404) {
-          response = await this.fetchWithAccount(
-            (ref) =>
-              `${this.baseUrl}/backend-api/trade/accounts/${ref}/quotes?symbols=${encodeURIComponent(symbol)}`,
-            "GET",
+        try {
+          const response = await this.authorizedFetch(
+            `${this.baseUrl}/backend-api/prices/instruments?symbols=${encodeURIComponent(symbol)}`,
+            {
+              method: "GET",
+              headers: {},
+            }
           );
-        }
 
-        if (!response.ok) {
-          const text = await response.text().catch(() => "");
-          throw new Error(
-            `Quote request failed for ${symbol}: ${response.status} ${response.statusText} ${text}`.trim(),
-          );
-        }
+          if (!response.ok) {
+            console.warn(`Quote unavailable for ${symbol}: ${response.status}`);
+            continue;
+          }
 
-        const data = await response.json();
-        
-        // Handle wrapped response: {s:"ok", d:{quotes:[...]}} or {s:"ok", d:{quote:{...}}}
-        let unwrapped = data;
-        if (data.d) {
-          unwrapped = data.d.quotes || data.d.quote || data.d;
-        }
-        
-        const arr = Array.isArray(unwrapped) ? unwrapped : [unwrapped];
-        const parsed = arr
-          .map((item: any) => {
-            const s = item.s ?? item.symbol ?? symbol;
-            const bid = item.bid ?? item.b;
-            const ask = item.ask ?? item.a;
-            if (typeof bid !== "number" || typeof ask !== "number") return null;
-            return { s, bid, ask, timestamp: now };
-          })
-          .filter(Boolean) as Quote[];
+          const data = await response.json();
+          
+          // Handle wrapped response: {s:"ok", d:{quotes:[...]}} or {s:"ok", d:{quote:{...}}}
+          let unwrapped = data;
+          if (data.d) {
+            unwrapped = data.d.quotes || data.d.quote || data.d.prices || data.d;
+          }
+          
+          const arr = Array.isArray(unwrapped) ? unwrapped : [unwrapped];
+          const parsed = arr
+            .map((item: any) => {
+              const s = item.s ?? item.symbol ?? item.name ?? symbol;
+              const bid = item.bid ?? item.b ?? item.bidPrice;
+              const ask = item.ask ?? item.a ?? item.askPrice;
+              if (typeof bid !== "number" || typeof ask !== "number") return null;
+              return { s, bid, ask, timestamp: now };
+            })
+            .filter(Boolean) as Quote[];
 
-        quotes.push(...parsed);
+          quotes.push(...parsed);
+        } catch (err) {
+          console.warn(`Failed to fetch quote for ${symbol}:`, err);
+          continue;
+        }
       }
 
+      // If no quotes found, return empty (dashboard will use mock)
       return quotes;
     } catch (error: any) {
-      throw new Error(`Failed to get quotes: ${error.message}`);
+      console.error("Failed to get quotes:", error.message);
+      return []; // Return empty instead of throwing
     }
   }
 
