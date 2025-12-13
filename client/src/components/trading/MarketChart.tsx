@@ -286,7 +286,7 @@ export function MarketChart() {
       : [];
 
     setChartReady(true);
-  }, [timeframe, candleSeries, fastEmaSeries, slowEmaSeries, showLevels, livePrice]);
+  }, [timeframe, symbol, candleSeries, fastEmaSeries, slowEmaSeries, showLevels, livePrice]);
 
   // Toggle Strategy Visibility
   useEffect(() => {
