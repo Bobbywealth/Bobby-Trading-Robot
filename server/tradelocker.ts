@@ -124,13 +124,12 @@ export class TradeLockerService {
   }
 
   private getPrimaryAccountRef(): string | number | null {
+    // Use accountId for path; accountNumber will go to headers.
     return this.accountIdRef ?? this.accountNumberRef ?? null;
   }
 
-  private getSecondaryAccountRef(primary: string | number | null): string | number | null {
-    const secondary = this.accountNumberRef ?? this.accountIdRef ?? null;
-    if (secondary === primary) return null;
-    return secondary;
+  private getHeaderAccountNumber(): string | number | null {
+    return this.accountNumberRef ?? this.accountIdRef ?? null;
   }
 
   private async refreshAccessToken(): Promise<void> {
@@ -203,36 +202,25 @@ export class TradeLockerService {
       throw new Error("No account reference available");
     }
 
-    const attempt = async (ref: string | number) => {
-      const headers: Record<string, string> = {
-        accNum: String(ref),
-        accountNumber: String(ref),
-        "Account-Number": String(ref),
-      };
-      if (this.accountIdRef) {
-        headers.accountId = String(this.accountIdRef);
-      }
+    const headerAcc = this.getHeaderAccountNumber() ?? primaryRef;
 
-      return this.authorizedFetch(buildPath(ref), {
-        method,
-        headers: {
-          ...headers,
-          ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
-        },
-        body: method === "POST" && body ? JSON.stringify(body) : undefined,
-      });
+    const headers: Record<string, string> = {
+      accNum: String(headerAcc),
+      accountNumber: String(headerAcc),
+      "Account-Number": String(headerAcc),
     };
-
-    let res = await attempt(primaryRef);
-    if (res.ok) return res;
-
-    const status = res.status;
-    const secondary = this.getSecondaryAccountRef(primaryRef);
-    if (secondary && (status === 400 || status === 401 || status === 404)) {
-      res = await attempt(secondary);
+    if (this.accountIdRef) {
+      headers.accountId = String(this.accountIdRef);
     }
 
-    return res;
+    return this.authorizedFetch(buildPath(primaryRef), {
+      method,
+      headers: {
+        ...headers,
+        ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+      },
+      body: method === "POST" && body ? JSON.stringify(body) : undefined,
+    });
   }
 
   async authenticate(email: string, password: string, server?: string): Promise<AuthResponse> {
