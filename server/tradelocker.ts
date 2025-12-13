@@ -62,7 +62,8 @@ export class TradeLockerService {
   private serverName: string;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
-  private accountRef: string | number | null = null;
+  private accountNumberRef: string | number | null = null;
+  private accountIdRef: string | number | null = null;
 
   private async refresh(): Promise<void> {
     if (!this.refreshToken) {
@@ -110,14 +111,16 @@ export class TradeLockerService {
     this.baseUrl = `https://${mappedServer}`;
   }
 
-  setCredentials(accessToken: string, refreshToken: string, accNum?: string | number, accountId?: string | number) {
+  setCredentials(
+    accessToken: string,
+    refreshToken: string,
+    accountNumber?: string | number,
+    accountId?: string | number,
+  ) {
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
-    if (accountId !== undefined && accountId !== null) {
-      this.accountRef = accountId;
-    } else if (accNum !== undefined) {
-      this.accountRef = accNum;
-    }
+    this.accountNumberRef = accountNumber ?? accountId ?? null;
+    this.accountIdRef = accountId ?? null;
   }
 
   private async refreshAccessToken(): Promise<void> {
@@ -231,19 +234,20 @@ export class TradeLockerService {
   }
 
   async getInstruments(): Promise<Instrument[]> {
-    if (!this.accessToken || !this.accountRef) {
+    if (!this.accessToken || !this.accountNumberRef) {
       throw new Error("Not authenticated or no account selected");
     }
 
     try {
       const response = await this.authorizedFetch(
-        `${this.baseUrl}/backend-api/trade/accounts/${this.accountRef}/instruments`,
+        `${this.baseUrl}/backend-api/trade/accounts/${this.accountNumberRef}/instruments`,
         {
           method: "GET",
           headers: {
-            accNum: String(this.accountRef),
-            accountNumber: String(this.accountRef),
-            "Account-Number": String(this.accountRef),
+            accNum: String(this.accountNumberRef),
+            accountNumber: String(this.accountNumberRef),
+            "Account-Number": String(this.accountNumberRef),
+            ...(this.accountIdRef ? { accountId: String(this.accountIdRef) } : {}),
           },
         }
       );
@@ -260,7 +264,7 @@ export class TradeLockerService {
   }
 
   async getQuotes(symbols: string[]): Promise<Quote[]> {
-    if (!this.accessToken || !this.accountRef) {
+    if (!this.accessToken || !this.accountNumberRef) {
       throw new Error("Not authenticated or no account selected");
     }
 
@@ -269,13 +273,14 @@ export class TradeLockerService {
       
       for (const symbol of symbols) {
         const response = await this.authorizedFetch(
-          `${this.baseUrl}/backend-api/trade/accounts/${this.accountRef}/quotes/${symbol}`,
+          `${this.baseUrl}/backend-api/trade/accounts/${this.accountNumberRef}/quotes/${symbol}`,
           {
             method: "GET",
             headers: {
-              accNum: String(this.accountRef),
-              accountNumber: String(this.accountRef),
-              "Account-Number": String(this.accountRef),
+              accNum: String(this.accountNumberRef),
+              accountNumber: String(this.accountNumberRef),
+              "Account-Number": String(this.accountNumberRef),
+              ...(this.accountIdRef ? { accountId: String(this.accountIdRef) } : {}),
             },
           }
         );
@@ -310,19 +315,20 @@ export class TradeLockerService {
   }
 
   async getOpenPositions(): Promise<any[]> {
-    if (!this.accessToken || !this.accountRef) {
+    if (!this.accessToken || !this.accountNumberRef) {
       throw new Error("Not authenticated or no account selected");
     }
 
     try {
       const response = await this.authorizedFetch(
-        `${this.baseUrl}/backend-api/trade/accounts/${this.accountRef}/positions`,
+        `${this.baseUrl}/backend-api/trade/accounts/${this.accountNumberRef}/positions`,
         {
           method: "GET",
           headers: {
-            accNum: String(this.accountRef),
-            accountNumber: String(this.accountRef),
-            "Account-Number": String(this.accountRef),
+            accNum: String(this.accountNumberRef),
+            accountNumber: String(this.accountNumberRef),
+            "Account-Number": String(this.accountNumberRef),
+            ...(this.accountIdRef ? { accountId: String(this.accountIdRef) } : {}),
           },
         }
       );
@@ -339,20 +345,21 @@ export class TradeLockerService {
   }
 
   async placeOrder(order: OrderRequest): Promise<OrderResponse> {
-    if (!this.accessToken || !this.accountRef) {
+    if (!this.accessToken || !this.accountNumberRef) {
       throw new Error("Not authenticated or no account selected");
     }
 
     try {
       const response = await this.authorizedFetch(
-        `${this.baseUrl}/backend-api/trade/accounts/${this.accountRef}/orders`,
+        `${this.baseUrl}/backend-api/trade/accounts/${this.accountNumberRef}/orders`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            accNum: String(this.accountRef),
-            accountNumber: String(this.accountRef),
-            "Account-Number": String(this.accountRef),
+            accNum: String(this.accountNumberRef),
+            accountNumber: String(this.accountNumberRef),
+            "Account-Number": String(this.accountNumberRef),
+            ...(this.accountIdRef ? { accountId: String(this.accountIdRef) } : {}),
           },
           body: JSON.stringify({
             instrumentId: order.instrumentId,
