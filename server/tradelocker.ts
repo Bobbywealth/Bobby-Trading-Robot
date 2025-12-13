@@ -436,23 +436,47 @@ export class TradeLockerService {
     }
 
     try {
+      // Get instrument to find TRADE routeId
+      const instruments = await this.getInstruments();
+      const instrument = instruments.find((i: any) => i.tradableInstrumentId === order.instrumentId);
+      const tradeRouteId = instrument?.routes?.find((r: any) => r.type === "TRADE")?.id;
+      
+      if (!tradeRouteId) {
+        throw new Error(`No TRADE routeId found for instrument ${order.instrumentId}`);
+      }
+
+      const orderPayload = {
+        instrumentId: order.instrumentId,
+        qty: order.qty,
+        side: order.side,
+        type: order.type,
+        routeId: tradeRouteId,
+        ...(order.price && { price: order.price }),
+        ...(order.stopLoss && { stopLoss: order.stopLoss }),
+        ...(order.takeProfit && { takeProfit: order.takeProfit }),
+      };
+
+      console.log(`[TradeLocker] Placing order:`, orderPayload);
+
       const response = await this.fetchWithAccount(
         (ref) => `${this.baseUrl}/backend-api/trade/accounts/${ref}/orders`,
         "POST",
-        {
-          instrumentId: order.instrumentId,
-          qty: order.qty,
-          side: order.side,
-          type: order.type,
-          price: order.price,
-          stopLoss: order.stopLoss,
-          takeProfit: order.takeProfit,
-        },
+        orderPayload,
       );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Failed to place order: ${response.status} ${JSON.stringify(errorData)}`);
+        const errorMsg = errorData.message || errorData.error || JSON.stringify(errorData);
+        
+        // Provide user-friendly messages for common errors
+        if (response.status === 409) {
+          if (errorMsg.toLowerCase().includes("window closed") || errorMsg.toLowerCase().includes("market closed")) {
+            throw new Error("Market is currently closed. Trading hours: Mon-Fri 23:00-22:00 GMT (1hr maintenance daily)");
+          }
+          throw new Error(`Order rejected: ${errorMsg}`);
+        }
+        
+        throw new Error(`Order failed (${response.status}): ${errorMsg}`);
       }
 
       const data = await response.json();
