@@ -255,7 +255,8 @@ export async function registerRoutes(
       const { accountId, accountNumber } = z
         .object({
           accountId: z.string(),
-          accountNumber: z.string(),
+          // accept numbers but store as string
+          accountNumber: z.coerce.string(),
         })
         .parse(req.body);
 
