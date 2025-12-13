@@ -239,8 +239,8 @@ export async function registerRoutes(
           name: a.name,
           accNum: a.accNum,
           currency: a.currency,
-          balance: a.accountBalance,
-          equity: a.accountEquity,
+          balance: Number(a.accountBalance ?? (a as any).balance ?? 0),
+          equity: Number(a.accountEquity ?? (a as any).equity ?? 0),
         })),
       });
     } catch (error: any) {
@@ -344,8 +344,8 @@ export async function registerRoutes(
           name: a.name,
           accNum: a.accNum,
           currency: a.currency,
-          balance: a.accountBalance,
-          equity: a.accountEquity,
+          balance: Number(a.accountBalance ?? (a as any).balance ?? 0),
+          equity: Number(a.accountEquity ?? (a as any).equity ?? 0),
         }))
       );
     } catch (error: any) {

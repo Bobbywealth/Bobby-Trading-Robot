@@ -305,38 +305,31 @@ export class TradeLockerService {
     }
 
     try {
-      const quotes: Quote[] = [];
-      
-      for (const symbol of symbols) {
-        const response = await this.fetchWithAccount(
-          (ref) => `${this.baseUrl}/backend-api/trade/accounts/${ref}/quotes/${symbol}`,
-          "GET",
+      const symbolsParam = symbols.join(",");
+      const response = await this.fetchWithAccount(
+        (ref) => `${this.baseUrl}/backend-api/trade/accounts/${ref}/quotes?symbols=${encodeURIComponent(symbolsParam)}`,
+        "GET",
+      );
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new Error(
+          `Quote request failed: ${response.status} ${response.statusText} ${text}`.trim()
         );
-
-        if (!response.ok) {
-          const text = await response.text().catch(() => "");
-          throw new Error(
-            `Quote request failed for ${symbol}: ${response.status} ${response.statusText} ${text}`.trim()
-          );
-        }
-
-        const data = await response.json();
-        const bid = data.bid ?? data.b;
-        const ask = data.ask ?? data.a;
-
-        if (typeof bid !== "number" || typeof ask !== "number") {
-          throw new Error(`Quote payload missing bid/ask for ${symbol}: ${JSON.stringify(data)}`);
-        }
-
-        quotes.push({
-          s: symbol,
-          bid,
-          ask,
-          timestamp: Date.now(),
-        });
       }
 
-      return quotes;
+      const data = await response.json();
+      const now = Date.now();
+      const arr = Array.isArray(data) ? data : [data];
+      return arr
+        .map((item: any) => {
+          const s = item.s ?? item.symbol ?? item.name;
+          const bid = item.bid ?? item.b;
+          const ask = item.ask ?? item.a;
+          if (typeof bid !== "number" || typeof ask !== "number" || !s) return null;
+          return { s, bid, ask, timestamp: now };
+        })
+        .filter(Boolean) as Quote[];
     } catch (error: any) {
       throw new Error(`Failed to get quotes: ${error.message}`);
     }
