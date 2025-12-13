@@ -123,6 +123,16 @@ export class TradeLockerService {
     this.accountIdRef = accountId ?? null;
   }
 
+  private getPrimaryAccountRef(): string | number | null {
+    return this.accountNumberRef ?? this.accountIdRef ?? null;
+  }
+
+  private getSecondaryAccountRef(primary: string | number | null): string | number | null {
+    const secondary = this.accountIdRef ?? this.accountNumberRef ?? null;
+    if (secondary === primary) return null;
+    return secondary;
+  }
+
   private async refreshAccessToken(): Promise<void> {
     if (!this.refreshToken) {
       throw new Error("Missing refresh token. Please reconnect.");
@@ -174,6 +184,52 @@ export class TradeLockerService {
     if (res.status === 401 && retry) {
       await this.refreshAccessToken();
       return this.authorizedFetch(input, init, false);
+    }
+
+    return res;
+  }
+
+  /**
+   * Try primary account ref, and if broker rejects with 400/401/404 and a different
+   * account ref is available, retry once with the alternate ref.
+   */
+  private async fetchWithAccount(
+    buildPath: (ref: string | number) => string,
+    method: "GET" | "POST" = "GET",
+    body?: any,
+  ): Promise<Response> {
+    const primaryRef = this.getPrimaryAccountRef();
+    if (!primaryRef) {
+      throw new Error("No account reference available");
+    }
+
+    const attempt = async (ref: string | number) => {
+      const headers: Record<string, string> = {
+        accNum: String(ref),
+        accountNumber: String(ref),
+        "Account-Number": String(ref),
+      };
+      if (this.accountIdRef) {
+        headers.accountId = String(this.accountIdRef);
+      }
+
+      return this.authorizedFetch(buildPath(ref), {
+        method,
+        headers: {
+          ...headers,
+          ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+        },
+        body: method === "POST" && body ? JSON.stringify(body) : undefined,
+      });
+    };
+
+    let res = await attempt(primaryRef);
+    if (res.ok) return res;
+
+    const status = res.status;
+    const secondary = this.getSecondaryAccountRef(primaryRef);
+    if (secondary && (status === 400 || status === 401 || status === 404)) {
+      res = await attempt(secondary);
     }
 
     return res;
@@ -239,17 +295,9 @@ export class TradeLockerService {
     }
 
     try {
-      const response = await this.authorizedFetch(
-        `${this.baseUrl}/backend-api/trade/accounts/${this.accountNumberRef}/instruments`,
-        {
-          method: "GET",
-          headers: {
-            accNum: String(this.accountNumberRef),
-            accountNumber: String(this.accountNumberRef),
-            "Account-Number": String(this.accountNumberRef),
-            ...(this.accountIdRef ? { accountId: String(this.accountIdRef) } : {}),
-          },
-        }
+      const response = await this.fetchWithAccount(
+        (ref) => `${this.baseUrl}/backend-api/trade/accounts/${ref}/instruments`,
+        "GET",
       );
 
       if (!response.ok) {
@@ -272,17 +320,9 @@ export class TradeLockerService {
       const quotes: Quote[] = [];
       
       for (const symbol of symbols) {
-        const response = await this.authorizedFetch(
-          `${this.baseUrl}/backend-api/trade/accounts/${this.accountNumberRef}/quotes/${symbol}`,
-          {
-            method: "GET",
-            headers: {
-              accNum: String(this.accountNumberRef),
-              accountNumber: String(this.accountNumberRef),
-              "Account-Number": String(this.accountNumberRef),
-              ...(this.accountIdRef ? { accountId: String(this.accountIdRef) } : {}),
-            },
-          }
+        const response = await this.fetchWithAccount(
+          (ref) => `${this.baseUrl}/backend-api/trade/accounts/${ref}/quotes/${symbol}`,
+          "GET",
         );
 
         if (!response.ok) {
@@ -320,17 +360,9 @@ export class TradeLockerService {
     }
 
     try {
-      const response = await this.authorizedFetch(
-        `${this.baseUrl}/backend-api/trade/accounts/${this.accountNumberRef}/positions`,
-        {
-          method: "GET",
-          headers: {
-            accNum: String(this.accountNumberRef),
-            accountNumber: String(this.accountNumberRef),
-            "Account-Number": String(this.accountNumberRef),
-            ...(this.accountIdRef ? { accountId: String(this.accountIdRef) } : {}),
-          },
-        }
+      const response = await this.fetchWithAccount(
+        (ref) => `${this.baseUrl}/backend-api/trade/accounts/${ref}/positions`,
+        "GET",
       );
 
       if (!response.ok) {
@@ -350,27 +382,18 @@ export class TradeLockerService {
     }
 
     try {
-      const response = await this.authorizedFetch(
-        `${this.baseUrl}/backend-api/trade/accounts/${this.accountNumberRef}/orders`,
+      const response = await this.fetchWithAccount(
+        (ref) => `${this.baseUrl}/backend-api/trade/accounts/${ref}/orders`,
+        "POST",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            accNum: String(this.accountNumberRef),
-            accountNumber: String(this.accountNumberRef),
-            "Account-Number": String(this.accountNumberRef),
-            ...(this.accountIdRef ? { accountId: String(this.accountIdRef) } : {}),
-          },
-          body: JSON.stringify({
-            instrumentId: order.instrumentId,
-            qty: order.qty,
-            side: order.side,
-            type: order.type,
-            price: order.price,
-            stopLoss: order.stopLoss,
-            takeProfit: order.takeProfit,
-          }),
-        }
+          instrumentId: order.instrumentId,
+          qty: order.qty,
+          side: order.side,
+          type: order.type,
+          price: order.price,
+          stopLoss: order.stopLoss,
+          takeProfit: order.takeProfit,
+        },
       );
 
       if (!response.ok) {
