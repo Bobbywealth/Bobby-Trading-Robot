@@ -124,11 +124,11 @@ export class TradeLockerService {
   }
 
   private getPrimaryAccountRef(): string | number | null {
-    return this.accountNumberRef ?? this.accountIdRef ?? null;
+    return this.accountIdRef ?? this.accountNumberRef ?? null;
   }
 
   private getSecondaryAccountRef(primary: string | number | null): string | number | null {
-    const secondary = this.accountIdRef ?? this.accountNumberRef ?? null;
+    const secondary = this.accountNumberRef ?? this.accountIdRef ?? null;
     if (secondary === primary) return null;
     return secondary;
   }
