@@ -271,6 +271,9 @@ export async function registerRoutes(
         accountNumber,
       });
 
+      // reset cached client so new accountId/number are used
+      clearTradeLockerService(MOCK_USER_ID);
+
       initializeTradeLockerService(
         MOCK_USER_ID,
         credential.server,
