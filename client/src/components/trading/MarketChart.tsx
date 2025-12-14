@@ -1,14 +1,13 @@
 /**
  * MarketChart Component
  * 
- * ⚠️ IMPORTANT DATA SOURCE LIMITATION:
- * This chart displays SIMULATED historical candles (all but the latest candle are fake).
- * Only new candles created from live broker feeds are real.
+ * Currently using lightweight-charts with TradeLocker data.
+ * 
+ * Alternative: TradingView integration
+ * - Option 1 (Free): Embedded TradingView widget (useTradingViewWidget = true)
+ * - Option 2 (Paid): Advanced Charts library with Broker API integration
  * 
  * For debugging price discrepancies, see: /CHART_DATA_DEBUGGING.md
- * 
- * Console logging is enabled to help developers identify data source issues.
- * Look for [MarketChart] logs in browser console for detailed feed information.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -166,6 +165,9 @@ export function MarketChart() {
   const levelLinesRef = useRef<IPriceLine[]>([]);
   const [isHistoricalDataSimulated, setIsHistoricalDataSimulated] = useState(true);
   const [liveCandleCount, setLiveCandleCount] = useState(0);
+  
+  // Toggle between lightweight-charts and TradingView widget
+  const [useTradingViewWidget, setUseTradingViewWidget] = useState(false);
 
   const { data: brokerStatus, isLoading: isStatusLoading } = useBrokerStatus();
   const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
@@ -207,7 +209,7 @@ export function MarketChart() {
 
   // Initialize chart shell and series
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    if (!chartContainerRef.current || useTradingViewWidget) return;
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -549,6 +551,11 @@ export function MarketChart() {
                 Historical: Real ({historicalCandles.length} candles)
               </Badge>
             )}
+            {useTradingViewWidget && (
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-xs">
+                TradingView Data
+              </Badge>
+            )}
             {isConnected && liveCandleCount > 0 && (
               <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 text-xs">
                 {liveCandleCount} Live {liveCandleCount === 1 ? 'Candle' : 'Candles'}
@@ -613,27 +620,37 @@ export function MarketChart() {
               ))}
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8 bg-background/50 border-border/50"
-            onClick={() => setShowStrategy(!showStrategy)}
-            title="Toggle Strategy"
-            data-testid="button-toggle-strategy"
+          {!useTradingViewWidget && (
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 bg-background/50 border-border/50"
+                onClick={() => setShowStrategy(!showStrategy)}
+                title="Toggle Strategy"
+                data-testid="button-toggle-strategy"
+              >
+                {showStrategy ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className={`h-8 w-8 bg-background/50 border-border/50 ${showLevels ? "text-primary border-primary/50" : ""}`}
+                onClick={() => setShowLevels(!showLevels)}
+                title="Toggle Support/Resistance Levels"
+                data-testid="button-toggle-levels"
+              >
+                <TrendingUp className="w-4 h-4" />
+              </Button>
+            </>
+          )}
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className={`h-8 w-8 bg-background/50 border-border/50 ${useTradingViewWidget ? 'text-primary border-primary/50' : ''}`}
+            onClick={() => setUseTradingViewWidget(!useTradingViewWidget)}
+            title={useTradingViewWidget ? "Switch to Custom Chart" : "Switch to TradingView"}
           >
-            {showStrategy ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className={`h-8 w-8 bg-background/50 border-border/50 ${showLevels ? "text-primary border-primary/50" : ""}`}
-            onClick={() => setShowLevels(!showLevels)}
-            title="Toggle Support/Resistance Levels"
-            data-testid="button-toggle-levels"
-          >
-            <TrendingUp className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="h-8 w-8 bg-background/50 border-border/50">
             <Maximize2 className="w-4 h-4" />
           </Button>
           <Select value={timeframe} onValueChange={(value) => setTimeframe(value as TimeframeKey)}>
@@ -719,7 +736,17 @@ export function MarketChart() {
           })()
         )}
 
-        <div ref={chartContainerRef} className="absolute inset-0" />
+        {useTradingViewWidget ? (
+          // TradingView Widget (Free, Real Data)
+          <iframe
+            src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${symbol === 'XAUUSD' ? 'TVC:GOLD' : `FX:${symbol}`}&interval=${timeframe === '1m' ? '1' : timeframe === '5m' ? '5' : timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240'}&hidesidetoolbar=0&hidetoptoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=[]&disabled_features=[]&locale=en&utm_source=localhost&utm_medium=widget&utm_campaign=chart&utm_term=${symbol}`}
+            className="absolute inset-0 w-full h-full border-0"
+            title="TradingView Chart"
+          />
+        ) : (
+          // Lightweight Charts (Custom Implementation)
+          <div ref={chartContainerRef} className="absolute inset-0" />
+        )}
       </CardContent>
     </Card>
   );
