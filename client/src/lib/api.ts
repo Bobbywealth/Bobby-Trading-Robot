@@ -271,6 +271,29 @@ export function useBrokerQuotes(symbols: string[], enabled = true) {
   });
 }
 
+export function useBrokerCandles(
+  symbol: string,
+  timeframe: string,
+  count: number = 200,
+  enabled = true
+) {
+  return useQuery<
+    Array<{
+      time: number;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume?: number;
+    }>
+  >({
+    queryKey: [`/api/broker/candles?symbol=${symbol}&timeframe=${timeframe}&count=${count}`],
+    enabled: enabled && !!symbol && !!timeframe,
+    staleTime: 60000, // Cache for 1 minute
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useBrokerPositions() {
   return useQuery<any[]>({
     queryKey: ["/api/broker/positions"],

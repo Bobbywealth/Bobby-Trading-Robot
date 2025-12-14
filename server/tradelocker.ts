@@ -307,6 +307,129 @@ export class TradeLockerService {
     }
   }
 
+  async getHistoricalCandles(
+    symbol: string,
+    timeframe: string,
+    count: number = 200
+  ): Promise<Array<{
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume?: number;
+  }>> {
+    if (!this.accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    try {
+      // Get instruments to find the instrument ID and routeId
+      const instruments = await this.getInstruments();
+      const instrument = instruments.find((i: any) => i.name === symbol);
+      
+      if (!instrument) {
+        console.warn(`[TradeLocker] Instrument ${symbol} not found`);
+        return [];
+      }
+
+      const infoRouteId = (instrument as any).routes?.find((r: any) => r.type === "INFO")?.id;
+      if (!infoRouteId) {
+        console.warn(`[TradeLocker] No INFO routeId for ${symbol}`);
+        return [];
+      }
+
+      // Map common timeframe formats to TradeLocker format
+      const timeframeMap: Record<string, string> = {
+        "1m": "1m",
+        "5m": "5m",
+        "15m": "15m",
+        "1h": "1h",
+        "4h": "4h",
+        "1d": "1d",
+      };
+      const tf = timeframeMap[timeframe] || timeframe;
+
+      const headerAcc = this.getHeaderAccountNumber() ?? this.getPrimaryAccountRef();
+      const headers: Record<string, string> = {};
+      if (headerAcc) {
+        headers.accNum = String(headerAcc);
+        headers.accountNumber = String(headerAcc);
+      }
+
+      // Try multiple possible candles endpoint formats
+      const endpointsToTry = [
+        `${this.baseUrl}/backend-api/trade/instruments/${(instrument as any).tradableInstrumentId}/candles?routeId=${infoRouteId}&interval=${tf}&count=${count}`,
+        `${this.baseUrl}/backend-api/trade/instruments/${(instrument as any).tradableInstrumentId}/bars?routeId=${infoRouteId}&resolution=${tf}&count=${count}`,
+        `${this.baseUrl}/backend-api/trade/candles?routeId=${infoRouteId}&tradableInstrumentId=${(instrument as any).tradableInstrumentId}&interval=${tf}&count=${count}`,
+        `${this.baseUrl}/backend-api/trade/history?routeId=${infoRouteId}&tradableInstrumentId=${(instrument as any).tradableInstrumentId}&timeframe=${tf}&limit=${count}`,
+      ];
+
+      for (const url of endpointsToTry) {
+        try {
+          console.log(`[TradeLocker] Trying candles endpoint: ${url}`);
+          const response = await this.authorizedFetch(url, {
+            method: "GET",
+            headers,
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`[TradeLocker] ✅ Successfully fetched candles from: ${url}`);
+            
+            // Handle wrapped response
+            let unwrapped = data;
+            if (data.d) {
+              unwrapped = data.d.candles || data.d.bars || data.d;
+            }
+            
+            const arr = Array.isArray(unwrapped) ? unwrapped : [unwrapped];
+            const candles = arr
+              .map((item: any) => {
+                const time = item.time || item.timestamp || item.t;
+                const open = item.open || item.o;
+                const high = item.high || item.h;
+                const low = item.low || item.l;
+                const close = item.close || item.c;
+                const volume = item.volume || item.v;
+
+                if (typeof time !== "number" || typeof open !== "number" || 
+                    typeof high !== "number" || typeof low !== "number" || 
+                    typeof close !== "number") {
+                  return null;
+                }
+
+                return { time, open, high, low, close, volume };
+              })
+              .filter(Boolean) as Array<{
+                time: number;
+                open: number;
+                high: number;
+                low: number;
+                close: number;
+                volume?: number;
+              }>;
+
+            if (candles.length > 0) {
+              console.log(`[TradeLocker] Parsed ${candles.length} candles for ${symbol} (${timeframe})`);
+              return candles;
+            }
+          } else {
+            console.log(`[TradeLocker] Endpoint returned ${response.status}, trying next...`);
+          }
+        } catch (err) {
+          console.log(`[TradeLocker] Endpoint failed: ${err}, trying next...`);
+        }
+      }
+
+      console.warn(`[TradeLocker] ⚠️  No historical candles API found - all endpoints returned empty or error`);
+      return [];
+    } catch (error: any) {
+      console.error(`[TradeLocker] Error fetching historical candles:`, error.message);
+      return [];
+    }
+  }
+
   async getQuotes(symbols: string[]): Promise<Quote[]> {
     if (!this.accessToken) {
       throw new Error("Not authenticated");

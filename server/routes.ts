@@ -385,6 +385,52 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/broker/candles", async (req, res) => {
+    try {
+      const { symbol, timeframe, count } = req.query;
+      
+      if (!symbol || !timeframe) {
+        return res.status(400).json({ 
+          error: "Missing required parameters",
+          details: "symbol and timeframe are required" 
+        });
+      }
+
+      const credential = await storage.getBrokerCredential(MOCK_USER_ID);
+      if (!credential || !credential.accessToken) {
+        return res.status(401).json({ error: "Not connected to broker" });
+      }
+      if (!credential.accountNumber) {
+        return res.status(409).json({ error: "No account selected" });
+      }
+
+      const tradeLocker = initializeTradeLockerService(
+        MOCK_USER_ID,
+        credential.server,
+        credential.accessToken,
+        credential.refreshToken!,
+        credential.accountNumber,
+        credential.accountId
+      );
+
+      const candlesCount = count ? parseInt(count as string) : 200;
+      const candles = await tradeLocker.getHistoricalCandles(
+        symbol as string,
+        timeframe as string,
+        candlesCount
+      );
+
+      console.log(`[API /broker/candles] Fetched ${candles.length} candles for ${symbol} (${timeframe})`);
+      res.json(candles);
+    } catch (error: any) {
+      console.error(`[API /broker/candles] Error:`, error.message);
+      res.status(500).json({
+        error: "Failed to fetch candles",
+        details: error?.message,
+      });
+    }
+  });
+
   app.get("/api/broker/quotes", async (req, res) => {
     const symbols = (req.query.symbols as string)?.split(",") || ["EURUSD"];
 

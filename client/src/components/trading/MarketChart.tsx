@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, EyeOff, Maximize2, Wifi, WifiOff, TrendingUp, PlugZap } from "lucide-react";
-import { useBrokerStatus, useBrokerQuotes, useBrokerInstruments } from "@/lib/api";
+import { useBrokerStatus, useBrokerQuotes, useBrokerInstruments, useBrokerCandles } from "@/lib/api";
 
 const TIMEFRAMES = {
   "1m": 60_000,
@@ -193,6 +193,18 @@ export function MarketChart() {
   } = useBrokerQuotes(isConnected && symbol ? [symbol] : []);
   const livePrice = liveQuotes?.[0];
 
+  // Fetch historical candles from broker
+  const {
+    data: historicalCandles,
+    isLoading: candlesLoading,
+    error: candlesError,
+  } = useBrokerCandles(
+    symbol,
+    timeframe,
+    200,
+    Boolean(isConnected && symbol)
+  );
+
   // Initialize chart shell and series
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -257,31 +269,47 @@ export function MarketChart() {
     const intervalMs = TIMEFRAMES[timeframe];
     const initialPrice = livePrice?.ask ?? livePrice?.bid ?? 2035;
     
-    // Log data source for debugging
-    if (livePrice) {
-      console.log(`[MarketChart] Initializing chart with LIVE price seed:`, {
-        symbol,
-        timeframe,
-        brokerBid: livePrice.bid,
-        brokerAsk: livePrice.ask,
-        brokerMid: ((livePrice.bid + livePrice.ask) / 2).toFixed(2),
-        timestamp: new Date(livePrice.timestamp).toISOString(),
-        source: (livePrice as any).source || 'tradelocker'
-      });
+    let initialData: Candle[];
+    let isRealData = false;
+
+    // Try to use real historical candles from broker first
+    if (historicalCandles && historicalCandles.length > 0) {
+      console.log(`[MarketChart] ✅ Using ${historicalCandles.length} REAL historical candles from TradeLocker`);
+      initialData = historicalCandles.map(c => ({
+        time: (c.time / 1000) as Time, // Convert ms to seconds
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      }));
+      isRealData = true;
+      setIsHistoricalDataSimulated(false);
     } else {
-      console.warn(`[MarketChart] No live price available - using MOCK data seed (${initialPrice})`);
+      // Fallback to simulated data if broker doesn't provide candles
+      console.warn(`[MarketChart] ⚠️  TradeLocker historical candles API not available`);
+      console.log(`[MarketChart] Falling back to SIMULATED historical candles`);
+      
+      if (livePrice) {
+        console.log(`[MarketChart] Seeding simulated data with LIVE price:`, {
+          symbol,
+          timeframe,
+          brokerBid: livePrice.bid,
+          brokerAsk: livePrice.ask,
+          brokerMid: ((livePrice.bid + livePrice.ask) / 2).toFixed(2),
+          timestamp: new Date(livePrice.timestamp).toISOString(),
+          source: (livePrice as any).source || 'tradelocker'
+        });
+      } else {
+        console.warn(`[MarketChart] No live price available - using default seed (${initialPrice})`);
+      }
+      
+      initialData = generateData(200, intervalMs, initialPrice);
+      setIsHistoricalDataSimulated(true);
     }
     
-    const initialData = generateData(200, intervalMs, initialPrice);
     candleDataRef.current = initialData;
     candleSeries.setData(initialData);
-    
-    // Track that historical data is simulated
-    setIsHistoricalDataSimulated(true);
     setLiveCandleCount(0);
-    
-    console.log(`[MarketChart] Generated ${initialData.length} SIMULATED historical candles for ${symbol} (${timeframe})`);
-    console.log(`[MarketChart] ⚠️  WARNING: Historical candles are SIMULATED. Only live updates will show real broker data.`);
 
     const fastEmaData = calculateEMA(initialData, 9);
     const slowEmaData = calculateEMA(initialData, 21);
@@ -342,7 +370,7 @@ export function MarketChart() {
       : [];
 
     setChartReady(true);
-  }, [timeframe, symbol, candleSeries, fastEmaSeries, slowEmaSeries, showLevels, livePrice]);
+  }, [timeframe, symbol, candleSeries, fastEmaSeries, slowEmaSeries, showLevels, livePrice, historicalCandles]);
 
   // Toggle Strategy Visibility
   useEffect(() => {
@@ -506,9 +534,19 @@ export function MarketChart() {
                 DEMO
               </Badge>
             )}
-            {isHistoricalDataSimulated && (
+            {candlesLoading && (
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-xs">
+                Loading historical...
+              </Badge>
+            )}
+            {!candlesLoading && isHistoricalDataSimulated && (
               <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-xs">
                 Historical: Simulated
+              </Badge>
+            )}
+            {!candlesLoading && !isHistoricalDataSimulated && historicalCandles && historicalCandles.length > 0 && (
+              <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 text-xs">
+                Historical: Real ({historicalCandles.length} candles)
               </Badge>
             )}
             {isConnected && liveCandleCount > 0 && (
@@ -640,10 +678,18 @@ export function MarketChart() {
           </div>
         )}
 
-        {isConnected && isHistoricalDataSimulated && liveCandleCount < 10 && (
+        {isConnected && !candlesLoading && isHistoricalDataSimulated && liveCandleCount < 10 && (
           <div className="absolute inset-x-0 top-2 flex justify-center px-4">
             <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 px-3 py-1.5 rounded text-xs font-mono max-w-2xl backdrop-blur-sm">
-              ⚠️ Historical candles are SIMULATED (generated locally). Only new candles use real broker data. {liveCandleCount > 0 && `(${liveCandleCount} live so far)`}
+              ⚠️ Historical candles are SIMULATED (TradeLocker API unavailable). Only new candles use real broker data. {liveCandleCount > 0 && `(${liveCandleCount} live so far)`}
+            </div>
+          </div>
+        )}
+
+        {isConnected && !candlesLoading && !isHistoricalDataSimulated && historicalCandles && historicalCandles.length > 0 && (
+          <div className="absolute inset-x-0 top-2 flex justify-center px-4">
+            <div className="bg-green-500/10 border border-green-500/30 text-green-600 dark:text-green-400 px-3 py-1.5 rounded text-xs font-mono max-w-2xl backdrop-blur-sm">
+              ✅ Using {historicalCandles.length} real historical candles from TradeLocker
             </div>
           </div>
         )}
