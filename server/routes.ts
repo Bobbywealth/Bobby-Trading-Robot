@@ -391,6 +391,7 @@ export async function registerRoutes(
     // Helper to provide safe mock data so the UI never hard-crashes when the
     // upstream broker rejects the request (expired token / bad route / sandbox).
     const sendMockQuotes = (reason: string) => {
+      console.warn(`[API /broker/quotes] Sending MOCK quotes for ${symbols.join(',')} - Reason: ${reason}`);
       const now = Date.now();
       const mock = symbols.map((s) => ({
         s,
@@ -425,9 +426,16 @@ export async function registerRoutes(
       if (!quotes.length) {
         return sendMockQuotes("broker_empty_response");
       }
+      
+      // Log successful real quotes
+      console.log(`[API /broker/quotes] ✅ Received REAL quotes from TradeLocker:`, 
+        quotes.map(q => `${q.s}: bid=${q.bid} ask=${q.ask}`).join(', ')
+      );
+      
       res.json(quotes);
     } catch (error: any) {
       const detail = error?.message || "Unknown error";
+      console.error(`[API /broker/quotes] ❌ Error fetching quotes:`, detail);
       // Keep the UI alive with mock quotes but surface the reason in payload.
       sendMockQuotes(detail);
     }

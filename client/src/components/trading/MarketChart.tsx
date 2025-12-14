@@ -1,3 +1,16 @@
+/**
+ * MarketChart Component
+ * 
+ * ⚠️ IMPORTANT DATA SOURCE LIMITATION:
+ * This chart displays SIMULATED historical candles (all but the latest candle are fake).
+ * Only new candles created from live broker feeds are real.
+ * 
+ * For debugging price discrepancies, see: /CHART_DATA_DEBUGGING.md
+ * 
+ * Console logging is enabled to help developers identify data source issues.
+ * Look for [MarketChart] logs in browser console for detailed feed information.
+ */
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
@@ -36,7 +49,25 @@ type Candle = {
   close: number;
 };
 
-// Generate realistic candlestick data for a given interval
+/**
+ * ⚠️ TEMPORARY SOLUTION: Generate simulated candlestick data
+ * 
+ * This generates FAKE historical data with random price movements.
+ * It's used because:
+ * 1. TradeLocker may not provide a historical OHLC candles API
+ * 2. We need to display something while waiting for real candles to accumulate
+ * 
+ * TODO: Replace with real historical data by:
+ * - Checking if TradeLocker has a candles/bars API endpoint
+ * - Implementing a backend route to fetch historical candles
+ * - Storing live candles in the database to build history over time
+ * - Consider using a third-party data provider (e.g., polygon.io, alphavantage)
+ * 
+ * Current behavior:
+ * - Seeds with live price if available, otherwise uses default (2035)
+ * - Generates 200 fake candles going backwards in time
+ * - Only new candles created from live quotes are real
+ */
 const generateData = (count: number, intervalMs: number, startPrice = 2035): Candle[] => {
   let price = startPrice;
   const data: Candle[] = [];
@@ -133,6 +164,8 @@ export function MarketChart() {
   const [timeframe, setTimeframe] = useState<TimeframeKey>("1h");
   const candleDataRef = useRef<Candle[]>([]);
   const levelLinesRef = useRef<IPriceLine[]>([]);
+  const [isHistoricalDataSimulated, setIsHistoricalDataSimulated] = useState(true);
+  const [liveCandleCount, setLiveCandleCount] = useState(0);
 
   const { data: brokerStatus, isLoading: isStatusLoading } = useBrokerStatus();
   const isConnected = brokerStatus?.connected && brokerStatus?.accountNumber;
@@ -223,9 +256,32 @@ export function MarketChart() {
 
     const intervalMs = TIMEFRAMES[timeframe];
     const initialPrice = livePrice?.ask ?? livePrice?.bid ?? 2035;
+    
+    // Log data source for debugging
+    if (livePrice) {
+      console.log(`[MarketChart] Initializing chart with LIVE price seed:`, {
+        symbol,
+        timeframe,
+        brokerBid: livePrice.bid,
+        brokerAsk: livePrice.ask,
+        brokerMid: ((livePrice.bid + livePrice.ask) / 2).toFixed(2),
+        timestamp: new Date(livePrice.timestamp).toISOString(),
+        source: (livePrice as any).source || 'tradelocker'
+      });
+    } else {
+      console.warn(`[MarketChart] No live price available - using MOCK data seed (${initialPrice})`);
+    }
+    
     const initialData = generateData(200, intervalMs, initialPrice);
     candleDataRef.current = initialData;
     candleSeries.setData(initialData);
+    
+    // Track that historical data is simulated
+    setIsHistoricalDataSimulated(true);
+    setLiveCandleCount(0);
+    
+    console.log(`[MarketChart] Generated ${initialData.length} SIMULATED historical candles for ${symbol} (${timeframe})`);
+    console.log(`[MarketChart] ⚠️  WARNING: Historical candles are SIMULATED. Only live updates will show real broker data.`);
 
     const fastEmaData = calculateEMA(initialData, 9);
     const slowEmaData = calculateEMA(initialData, 21);
@@ -327,6 +383,21 @@ export function MarketChart() {
 
     const data = candleDataRef.current;
     const last = data[data.length - 1];
+    
+    // Log live feed updates for debugging
+    const isNewCandle = !last || last.time !== candleTime;
+    console.log(`[MarketChart] Live quote update:`, {
+      symbol,
+      brokerBid: livePrice.bid.toFixed(2),
+      brokerAsk: livePrice.ask.toFixed(2),
+      brokerMid: midPrice.toFixed(2),
+      chartDisplayPrice: last?.close.toFixed(2) || 'N/A',
+      priceDiff: last ? (midPrice - last.close).toFixed(2) : 'N/A',
+      isNewCandle,
+      timestamp: new Date(quoteTime).toISOString(),
+      source: (livePrice as any).source || 'tradelocker',
+      reason: (livePrice as any).reason,
+    });
 
     if (last && last.time === candleTime) {
       const updatedBar = {
@@ -355,6 +426,10 @@ export function MarketChart() {
       };
       data.push(newBar);
       candleSeries.update(newBar);
+      
+      // Track live candles
+      setLiveCandleCount(prev => prev + 1);
+      console.log(`[MarketChart] ✅ New LIVE candle created from broker feed (total live: ${liveCandleCount + 1})`);
     }
 
     const fastEmaData = calculateEMA(data, 9);
@@ -381,11 +456,44 @@ export function MarketChart() {
 
   const displayPrice = livePrice ? ((livePrice.bid + livePrice.ask) / 2).toFixed(2) : "2,042.58";
 
+  // Expose debug info to window for console debugging
+  useEffect(() => {
+    (window as any).__chartDebug = {
+      symbol,
+      timeframe,
+      isConnected,
+      livePrice,
+      totalCandles: candleDataRef.current.length,
+      liveCandleCount,
+      isHistoricalDataSimulated,
+      lastCandle: candleDataRef.current[candleDataRef.current.length - 1],
+      getInfo: () => {
+        const last = candleDataRef.current[candleDataRef.current.length - 1];
+        console.group('🔍 Chart Debug Info');
+        console.log('Symbol:', symbol);
+        console.log('Timeframe:', timeframe);
+        console.log('Connected:', isConnected);
+        console.log('Live Price:', livePrice);
+        console.log('Total Candles:', candleDataRef.current.length);
+        console.log('Real Candles:', liveCandleCount);
+        console.log('Fake Candles:', candleDataRef.current.length - liveCandleCount);
+        console.log('Historical Data:', isHistoricalDataSimulated ? '⚠️ SIMULATED' : '✅ REAL');
+        console.log('Last Candle:', last);
+        if (livePrice && last) {
+          const brokerMid = (livePrice.bid + livePrice.ask) / 2;
+          const diff = Math.abs(brokerMid - last.close);
+          console.log('Price Difference:', diff.toFixed(2), diff > 1 ? '⚠️ LARGE' : '✅ OK');
+        }
+        console.groupEnd();
+      }
+    };
+  }, [symbol, timeframe, isConnected, livePrice, liveCandleCount, isHistoricalDataSimulated]);
+
   return (
     <Card className="h-full border-border/50 bg-card/30 backdrop-blur-sm overflow-hidden flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2 shrink-0 border-b border-border/20 bg-card/50">
         <div className="space-y-1">
-          <CardTitle className="font-display text-lg flex items-center gap-2">
+          <CardTitle className="font-display text-lg flex items-center gap-2 flex-wrap">
             {symbol} <span className="text-muted-foreground font-sans text-sm font-normal">Live price</span>
             {isConnected ? (
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs ml-2">
@@ -396,6 +504,16 @@ export function MarketChart() {
               <Badge variant="outline" className="bg-muted text-muted-foreground border-muted text-xs ml-2">
                 <WifiOff className="w-3 h-3 mr-1" />
                 DEMO
+              </Badge>
+            )}
+            {isHistoricalDataSimulated && (
+              <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-xs">
+                Historical: Simulated
+              </Badge>
+            )}
+            {isConnected && liveCandleCount > 0 && (
+              <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 text-xs">
+                {liveCandleCount} Live {liveCandleCount === 1 ? 'Candle' : 'Candles'}
               </Badge>
             )}
           </CardTitle>
@@ -410,6 +528,11 @@ export function MarketChart() {
                   <span className="text-primary">{livePrice.bid.toFixed(2)}</span>
                   <span className="text-muted-foreground ml-1">A:</span>
                   <span className="text-destructive">{livePrice.ask.toFixed(2)}</span>
+                  {(livePrice as any).source === 'mock' && (
+                    <span className="ml-2 text-yellow-500 text-xs" title={(livePrice as any).reason}>
+                      ⚠️ Mock
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -514,6 +637,14 @@ export function MarketChart() {
         {isConnected && quotesLoading && (
           <div className="absolute inset-x-0 top-2 flex justify-center">
             <Badge variant="outline" className="bg-muted/40 text-xs">Syncing live quotes…</Badge>
+          </div>
+        )}
+
+        {isConnected && isHistoricalDataSimulated && liveCandleCount < 10 && (
+          <div className="absolute inset-x-0 top-2 flex justify-center px-4">
+            <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 px-3 py-1.5 rounded text-xs font-mono max-w-2xl backdrop-blur-sm">
+              ⚠️ Historical candles are SIMULATED (generated locally). Only new candles use real broker data. {liveCandleCount > 0 && `(${liveCandleCount} live so far)`}
+            </div>
           </div>
         )}
 
