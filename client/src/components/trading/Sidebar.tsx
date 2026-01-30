@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Activity, Settings, Terminal, Shield, LogOut, Code, Plug } from "lucide-react";
+import { LayoutDashboard, Activity, Settings, Terminal, Shield, LogOut, Code, Plug, Signal as SignalIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBrokerStatus, useDisconnectBroker } from "@/lib/api";
 
@@ -13,6 +13,7 @@ export function Sidebar() {
 
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+    { icon: SignalIcon, label: "Trade Signals", href: "/signals" },
     { icon: Activity, label: "Live Trades", href: "/trades" },
     { icon: Code, label: "Strategy", href: "/strategy" },
     { icon: Terminal, label: "Logs", href: "/logs" },

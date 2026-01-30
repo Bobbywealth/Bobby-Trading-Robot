@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage, MOCK_USER_ID } from "./storage";
 import { createTradeLockerService, getTradeLockerService, clearTradeLockerService, initializeTradeLockerService } from "./tradelocker";
 import { strategyRunner } from "./strategy-runner";
+import { signalEngine } from "./signal-engine";
+import { wsServer } from "./websocket";
 import {
   insertStrategySchema,
   insertRiskConfigSchema,
@@ -10,6 +12,7 @@ import {
   insertSystemLogSchema,
   insertBacktestResultSchema,
   insertBrokerCredentialSchema,
+  insertTradeSignalSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -609,6 +612,219 @@ export async function registerRoutes(
 
   app.get("/api/strategies/active", async (_req, res) => {
     res.json(strategyRunner.status());
+  });
+
+  // Signal endpoints
+  app.get("/api/signals", async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const symbol = req.query.symbol as string | undefined;
+      const strategyId = req.query.strategyId as string | undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      
+      const signals = await storage.getSignals(MOCK_USER_ID, { status, symbol, strategyId, limit });
+      res.json(signals);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/signals/:id", async (req, res) => {
+    try {
+      const signal = await storage.getSignal(req.params.id);
+      if (!signal) {
+        return res.status(404).json({ error: "Signal not found" });
+      }
+      res.json(signal);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/signals/:id/execute", async (req, res) => {
+    try {
+      const signal = await storage.getSignal(req.params.id);
+      if (!signal) {
+        return res.status(404).json({ error: "Signal not found" });
+      }
+      
+      if (signal.status !== 'pending' && signal.status !== 'viewed') {
+        return res.status(400).json({ error: "Signal cannot be executed" });
+      }
+
+      const credential = await storage.getBrokerCredential(MOCK_USER_ID);
+      if (!credential || !credential.accessToken || !credential.accountNumber) {
+        return res.status(401).json({ error: "Not connected to broker" });
+      }
+
+      const tradeLocker = initializeTradeLockerService(
+        MOCK_USER_ID,
+        credential.server,
+        credential.accessToken,
+        credential.refreshToken!,
+        credential.accountNumber,
+        credential.accountId
+      );
+
+      // Get instrument ID for the symbol
+      const instruments = await tradeLocker.getInstruments();
+      const instrument = instruments.find((i: any) => i.symbol === signal.symbol);
+      if (!instrument) {
+        return res.status(404).json({ error: "Instrument not found" });
+      }
+
+      // Place the order
+      const orderResult = await tradeLocker.placeOrder({
+        instrumentId: instrument.id,
+        qty: 0.01, // Default lot size - could be from signal or risk config
+        side: signal.direction,
+        type: 'market',
+        price: signal.entryPrice,
+        stopLoss: signal.stopLoss,
+        takeProfit: signal.takeProfit,
+      });
+
+      // Update signal status
+      await storage.updateSignal(signal.id, {
+        status: 'executed',
+        executedAt: new Date(),
+        orderId: orderResult.orderId,
+      });
+
+      // Broadcast update via WebSocket
+      wsServer.broadcastSignalUpdate(signal.id, { status: 'executed', executedAt: new Date() });
+
+      res.json({ success: true, orderId: orderResult.orderId, signal });
+    } catch (error: any) {
+      res.status(400).json({
+        error: "Failed to execute signal",
+        details: error?.message,
+      });
+    }
+  });
+
+  app.post("/api/signals/:id/dismiss", async (req, res) => {
+    try {
+      const signal = await storage.getSignal(req.params.id);
+      if (!signal) {
+        return res.status(404).json({ error: "Signal not found" });
+      }
+      
+      if (signal.status !== 'pending' && signal.status !== 'viewed') {
+        return res.status(400).json({ error: "Signal cannot be dismissed" });
+      }
+
+      await storage.updateSignal(signal.id, { status: 'dismissed' });
+
+      // Broadcast update via WebSocket
+      wsServer.broadcastSignalUpdate(signal.id, { status: 'dismissed' });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/signals/:id/view", async (req, res) => {
+    try {
+      const signal = await storage.getSignal(req.params.id);
+      if (!signal) {
+        return res.status(404).json({ error: "Signal not found" });
+      }
+      
+      if (signal.status !== 'pending') {
+        return res.status(400).json({ error: "Signal already viewed or processed" });
+      }
+
+      await storage.updateSignal(signal.id, { status: 'viewed', viewedAt: new Date() });
+
+      // Broadcast update via WebSocket
+      wsServer.broadcastSignalUpdate(signal.id, { status: 'viewed', viewedAt: new Date() });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/signals/stats", async (req, res) => {
+    try {
+      const stats = await storage.getSignalStats(MOCK_USER_ID);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/signals/manual", async (req, res) => {
+    try {
+      const validatedData = insertTradeSignalSchema.parse({
+        ...req.body,
+        userId: MOCK_USER_ID,
+        status: 'pending',
+      });
+      
+      const signal = await storage.createSignal(validatedData);
+      
+      // Broadcast via WebSocket
+      wsServer.broadcastSignal(signal);
+      
+      res.json(signal);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Signal engine controls
+  app.post("/api/signals/start", async (req, res) => {
+    try {
+      const { strategyIds, symbols, mode, intervalMs, dryRun } = z.object({
+        strategyIds: z.array(z.string()),
+        symbols: z.array(z.string()),
+        mode: z.enum(['realtime', 'periodic']),
+        intervalMs: z.number().optional(),
+        dryRun: z.boolean().optional(),
+      }).parse(req.body);
+
+      const strategies = await Promise.all(
+        strategyIds.map(id => storage.getStrategy(id))
+      );
+      const validStrategies = strategies.filter((s): s is NonNullable<typeof s> => s !== undefined);
+
+      if (validStrategies.length === 0) {
+        return res.status(404).json({ error: "No valid strategies found" });
+      }
+
+      await signalEngine.start(validStrategies, {
+        mode,
+        intervalMs,
+        symbols,
+        dryRun,
+      });
+
+      res.json({ success: true, status: signalEngine.status() });
+    } catch (error: any) {
+      res.status(400).json({
+        error: "Failed to start signal engine",
+        details: error?.message,
+      });
+    }
+  });
+
+  app.post("/api/signals/stop", async (req, res) => {
+    try {
+      await signalEngine.stop();
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({
+        error: "Failed to stop signal engine",
+        details: error?.message,
+      });
+    }
+  });
+
+  app.get("/api/signals/engine/status", async (req, res) => {
+    res.json(signalEngine.status());
   });
 
   return httpServer;
