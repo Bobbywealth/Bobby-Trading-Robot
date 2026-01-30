@@ -1,15 +1,17 @@
 /**
  * MarketChart Component
- * Displays live market chart using Forex.game API for real-time quotes and historical candles
+ * Displays live market chart using ForexRateAPI for real-time quotes and historical candles
+ * Documentation: https://forexrateapi.com/documentation
  */
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, EyeOff, TrendingUp, TrendingDown } from "lucide-react";
-import { useForexQuotes, useForexCandles } from "@/lib/api";
+import { useForexRateQuotes, useForexRateCandles } from "@/lib/api";
+import { createChart, ColorType, CrosshairMode } from "lightweight-charts";
 
 const TIMEFRAMES = {
   "1m": 60_000,
@@ -29,8 +31,8 @@ export function MarketChart() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   
-  const { data: quotes, isLoading: quotesLoading } = useForexQuotes([symbol]);
-  const { data: candles, isLoading: candlesLoading } = useForexCandles(symbol, timeframe);
+  const { data: quotes, isLoading: quotesLoading } = useForexRateQuotes([symbol]);
+  const { data: candles, isLoading: candlesLoading } = useForexRateCandles(symbol, timeframe);
 
   const livePrice = quotes?.[0];
   const displayPrice = livePrice ? ((livePrice.bid + livePrice.ask) / 2).toFixed(2) : "2,042.58";
@@ -141,16 +143,15 @@ export function MarketChart() {
       <CardContent className="space-y-4">
         {/* Symbol and Timeframe Selection */}
         <div className="flex gap-4">
-          <Select value={symbol} onValueChange={setSymbol} disabled={isLoading}>
+          <Select value={symbol} onValueChange={setSymbol} disabled={quotesLoading || candlesLoading}>
             <SelectTrigger className="w-[140px] h-8 bg-background/50 border-border/50">
               <SelectValue placeholder="Symbol" />
             </SelectTrigger>
           </Select>
-          <Select value={timeframe} onValueChange={setTimeframe} disabled={isLoading}>
+          <Select value={timeframe} onValueChange={setTimeframe} disabled={quotesLoading || candlesLoading}>
             <SelectTrigger className="w-[140px] h-8 bg-background/50 border-border/50">
               <SelectValue placeholder="Timeframe" />
             </SelectTrigger>
-          </Select>
           </Select>
         </div>
 
@@ -171,10 +172,10 @@ export function MarketChart() {
         {chartReady && (
           <div className="flex gap-4 mt-4">
             <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${fastEma[fastEma.length - 1]?.value > (slowEma[slowEma.length - 1]?.value ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+              <div className={`w-3 h-3 rounded-full ${(fastEma && fastEma.length > 0 && slowEma && slowEma.length > 0 && fastEma[fastEma.length - 1]?.value > slowEma[slowEma.length - 1]?.value) ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
                 <span className="text-xs font-mono">Fast EMA (9)</span>
               </div>
-              <div className={`w-3 h-3 rounded-full ${slowEma[slowEma.length - 1]?.value > (fastEma[fastEma.length - 1]?.value ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+              <div className={`w-3 h-3 rounded-full ${(fastEma && fastEma.length > 0 && slowEma && slowEma.length > 0 && slowEma[slowEma.length - 1]?.value > fastEma[fastEma.length - 1]?.value) ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
                 <span className="text-xs font-mono">Slow EMA (21)</span>
               </div>
             </div>
@@ -191,8 +192,15 @@ export function MarketChart() {
                 variant="outline"
                 size="icon"
                 onClick={() => {
-                  if (fastEmaSeries) fastEmaSeries.applyOptions({ visible: !showLevels });
-                  if (slowEmaSeries) slowEmaSeries.applyOptions({ visible: !showLevels });
+                  if (chartRef.current) {
+                    const chart = chartRef.current;
+                    const series = chart.getSeries();
+                    series.forEach((s: any) => {
+                      if (s.options().name?.includes('EMA')) {
+                        s.applyOptions({ visible: !showLevels });
+                      }
+                    });
+                  }
                 }}
                 title={showLevels ? "Hide EMAs" : "Show EMAs"}
               >

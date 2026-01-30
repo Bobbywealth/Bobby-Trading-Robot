@@ -299,6 +299,8 @@ export function useBrokerPositions() {
     queryKey: ["/api/broker/positions"],
     refetchInterval: 5000,
   });
+}
+
 // ============================================================================
 // FOREX.GAME API
 // ============================================================================
@@ -396,7 +398,63 @@ export function useForexOrders(enabled = true) {
   });
 }
 
+// ============================================================================
+// FOREX RATE API - Primary provider for charts
+// ============================================================================
+
+export function useForexRateQuotes(symbols: string[], enabled = true) {
+  return useQuery<Array<ForexQuoteData>>({
+    queryKey: symbols.length > 0 ? [`/api/forex-rate/quotes?symbols=${symbols.join(',')}`] : ["/api/forex-rate/quotes"],
+    enabled: enabled,
+    refetchInterval: 1000,
+  });
 }
+
+export function useForexRateCandles(symbol: string, timeframe: string = 'H1', count: number = 200, enabled = true) {
+  return useQuery<Array<ForexCandleData>>({
+    queryKey: [`/api/forex-rate/candles?symbol=${symbol}&timeframe=${timeframe}&count=${count}`],
+    enabled: enabled,
+    staleTime: 60000, // Cache for 1 minute
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useForexRateAccounts(enabled = true) {
+  return useQuery<Array<ForexAccount>>({
+    queryKey: ["/api/forex-rate/accounts"],
+    enabled: enabled,
+    refetchInterval: 30000,
+  });
+}
+
+export function usePlaceForexRateOrder() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: ForexOrderRequest) => {
+      const res = await apiRequest("POST", "/api/forex-rate/orders", data);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const message = body?.error || body?.details || `HTTP ${res.status}`;
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/positions"] });
+    },
+  });
+}
+
+export function useForexRateOrders(enabled = true) {
+  return useQuery<Array<ForexOrderResult>>({
+    queryKey: ["/api/forex-rate/orders"],
+    enabled: enabled,
+    refetchInterval: 5000,
+  });
+}
+
 export function usePlaceOrder() {
   const queryClient = useQueryClient();
   return useMutation({

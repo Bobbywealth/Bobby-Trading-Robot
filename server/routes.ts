@@ -6,6 +6,7 @@ import { strategyRunner } from "./strategy-runner";
 import { signalEngine } from "./signal-engine";
 import { wsServer } from "./websocket";
 import { getForexGameService } from "./forex-game";
+import { getForexRateAPIService } from "./forex-rate-api";
 import {
   insertStrategySchema,
   insertRiskConfigSchema,
@@ -902,6 +903,84 @@ export async function registerRoutes(
       res.json(orders);
     } catch (error: any) {
       console.error('[API /forex/orders] Error:', error);
+      res.status(500).json({ error: "Failed to fetch orders", details: error?.message });
+    }
+  });
+
+  // ForexRateAPI endpoints - Primary provider for charts
+  app.get("/api/forex-rate/quotes", async (req, res) => {
+    try {
+      const symbols = (req.query.symbols as string)?.split(",") || ["XAUUSD", "EURUSD", "GBPUSD"];
+      const forexRate = getForexRateAPIService();
+      const quotes = await forexRate.getQuotes(symbols);
+      res.json(quotes);
+    } catch (error: any) {
+      console.error('[API /forex-rate/quotes] Error:', error);
+      res.status(500).json({ error: "Failed to fetch quotes", details: error?.message });
+    }
+  });
+
+  app.get("/api/forex-rate/candles", async (req, res) => {
+    try {
+      const { symbol, timeframe = 'H1', count = '200' } = req.query;
+      
+      if (!symbol || !timeframe) {
+        return res.status(400).json({
+          error: "Missing required parameters",
+          details: "symbol and timeframe are required"
+        });
+      }
+
+      const forexRate = getForexRateAPIService();
+      const candles = await forexRate.getCandles(symbol as string, timeframe as string, parseInt(count as string));
+      res.json(candles);
+    } catch (error: any) {
+      console.error('[API /forex-rate/candles] Error:', error);
+      res.status(500).json({ error: "Failed to fetch candles", details: error?.message });
+    }
+  });
+
+  app.get("/api/forex-rate/accounts", async (req, res) => {
+    try {
+      const forexRate = getForexRateAPIService();
+      const accounts = await forexRate.getAccounts();
+      res.json(accounts);
+    } catch (error: any) {
+      console.error('[API /forex-rate/accounts] Error:', error);
+      res.status(500).json({ error: "Failed to fetch accounts", details: error?.message });
+    }
+  });
+
+  app.post("/api/forex-rate/orders", async (req, res) => {
+    try {
+      const orderSchema = z.object({
+        symbol: z.string(),
+        side: z.enum(["buy", "sell"]),
+        type: z.enum(["market", "limit", "stop"]),
+        quantity: z.number().positive(),
+        price: z.number().optional(),
+        stopLoss: z.number().optional(),
+        takeProfit: z.number().optional(),
+      });
+
+      const orderData = orderSchema.parse(req.body);
+      const forexRate = getForexRateAPIService();
+      const result = await forexRate.placeOrder(orderData);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('[API /forex-rate/orders] Error:', error);
+      res.status(400).json({ error: "Failed to place order", details: error?.message });
+    }
+  });
+
+  app.get("/api/forex-rate/orders", async (req, res) => {
+    try {
+      const forexRate = getForexRateAPIService();
+      const orders = await forexRate.getOrders();
+      res.json(orders);
+    } catch (error: any) {
+      console.error('[API /forex-rate/orders] Error:', error);
       res.status(500).json({ error: "Failed to fetch orders", details: error?.message });
     }
   });
