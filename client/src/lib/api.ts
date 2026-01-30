@@ -299,8 +299,104 @@ export function useBrokerPositions() {
     queryKey: ["/api/broker/positions"],
     refetchInterval: 5000,
   });
+// ============================================================================
+// FOREX.GAME API
+// ============================================================================
+
+export interface ForexQuoteData {
+  symbol: string;
+  bid: number;
+  ask: number;
+  mid: number;
+  timestamp: number;
 }
 
+export interface ForexCandleData {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+export interface ForexOrderRequest {
+  symbol: string;
+  side: 'buy' | 'sell';
+  type: 'market' | 'limit' | 'stop';
+  quantity: number;
+  price?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+}
+
+export interface ForexOrderResult {
+  orderId: string;
+  status: 'pending' | 'filled' | 'rejected' | 'cancelled';
+  message?: string;
+}
+
+export interface ForexAccount {
+  accountId: string;
+  balance: number;
+  equity: number;
+  margin: number;
+  freeMargin: number;
+}
+
+export function useForexQuotes(symbols: string[], enabled = true) {
+  return useQuery<Array<ForexQuoteData>>({
+    queryKey: symbols.length > 0 ? [`/api/forex/quotes?symbols=${symbols.join(',')}`] : ["/api/forex/quotes"],
+    enabled: enabled,
+    refetchInterval: 1000,
+  });
+}
+
+export function useForexCandles(symbol: string, timeframe: string = 'H1', count: number = 200, enabled = true) {
+  return useQuery<Array<ForexCandleData>>({
+    queryKey: [`/api/forex/candles?symbol=${symbol}&timeframe=${timeframe}&count=${count}`],
+    enabled: enabled,
+    staleTime: 60000, // Cache for 1 minute
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useForexAccounts(enabled = true) {
+  return useQuery<Array<ForexAccount>>({
+    queryKey: ["/api/forex/accounts"],
+    enabled: enabled,
+    refetchInterval: 30000,
+  });
+}
+
+export function usePlaceForexOrder() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: ForexOrderRequest) => {
+      const res = await apiRequest("POST", "/api/forex/orders", data);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const message = body?.error || body?.details || `HTTP ${res.status}`;
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/positions"] });
+    },
+  });
+}
+
+export function useForexOrders(enabled = true) {
+  return useQuery<Array<ForexOrderResult>>({
+    queryKey: ["/api/forex/orders"],
+    enabled: enabled,
+    refetchInterval: 5000,
+  });
+}
+
+}
 export function usePlaceOrder() {
   const queryClient = useQueryClient();
   return useMutation({

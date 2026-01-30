@@ -5,7 +5,7 @@
 
 import vm from "node:vm";
 import { storage, MOCK_USER_ID } from "./storage";
-import { initializeTradeLockerService } from "./tradelocker";
+import { getForexGameService, type QuoteData, type CandleData } from "./forex-game";
 import { createIndicators, type Candle } from "./indicators";
 import type { BrokerCredential, RiskConfig, Strategy, TradeSignal } from "@shared/schema";
 import type { WebSocketServer as WSServer } from "./websocket";
@@ -40,7 +40,7 @@ interface StrategyContext {
   quotes: Record<string, QuoteData>;
   candles: Record<string, Candle[]>;
   indicators: ReturnType<typeof createIndicators>;
-  account: BrokerCredential;
+  account: any; // Forex.game account info
   riskConfig: RiskConfig | undefined;
   log: {
     info: (msg: string) => void;
@@ -61,9 +61,9 @@ class SignalEngine {
     dryRun: true,
     signalExpirationMinutes: 60,
   };
-  private credential: BrokerCredential | null = null;
+  private credential: any = null; // Forex.game account info
   private riskConfig: RiskConfig | undefined;
-  private tradeLocker: any = null;
+  private forexGame: any = null;
   private lastTick: number | null = null;
   private lastSignal: number | null = null;
   private totalSignalsGenerated = 0;
@@ -102,24 +102,11 @@ class SignalEngine {
     };
     this.activeSymbols = options.symbols;
 
-    // Get broker connection
-    this.credential = await storage.getBrokerCredential(MOCK_USER_ID);
-    if (!this.credential || !this.credential.accessToken || !this.credential.accountNumber) {
-      throw new Error("Broker not connected or account not selected");
-    }
+    // Get Forex.game service
+    this.forexGame = getForexGameService();
 
     // Get risk config
     this.riskConfig = await storage.getRiskConfig(MOCK_USER_ID);
-
-    // Initialize TradeLocker service
-    this.tradeLocker = initializeTradeLockerService(
-      MOCK_USER_ID,
-      this.credential.server,
-      this.credential.accessToken,
-      this.credential.refreshToken!,
-      this.credential.accountNumber,
-      this.credential.accountId
-    );
 
     // Load historical candles for each symbol
     await this.loadHistoricalCandles();
@@ -155,13 +142,13 @@ class SignalEngine {
   private async loadHistoricalCandles(): Promise<void> {
     for (const symbol of this.activeSymbols) {
       try {
-        const candles = await this.tradeLocker.getHistoricalCandles(symbol, 'H1', 100);
-        this.candlesCache[symbol] = candles.map((c: any) => ({
+        const candles = await this.forexGame.getCandles(symbol, 'H1', 200);
+        this.candlesCache[symbol] = candles.map((c: CandleData) => ({
           open: c.open,
           high: c.high,
           low: c.low,
           close: c.close,
-          timestamp: c.timestamp,
+          timestamp: c.time,
         }));
         console.log(`[signal-engine] Loaded ${candles.length} candles for ${symbol}`);
       } catch (err) {
@@ -173,7 +160,7 @@ class SignalEngine {
 
   private async tick(): Promise<void> {
     // Fetch current quotes for all symbols
-    const quotes = await this.tradeLocker.getQuotes(this.activeSymbols);
+    const quotes = await this.forexGame.getQuotes(this.activeSymbols);
     
     // Update candles cache with latest data
     for (const symbol of this.activeSymbols) {

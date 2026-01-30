@@ -5,6 +5,7 @@ import { createTradeLockerService, getTradeLockerService, clearTradeLockerServic
 import { strategyRunner } from "./strategy-runner";
 import { signalEngine } from "./signal-engine";
 import { wsServer } from "./websocket";
+import { getForexGameService } from "./forex-game";
 import {
   insertStrategySchema,
   insertRiskConfigSchema,
@@ -825,6 +826,84 @@ export async function registerRoutes(
 
   app.get("/api/signals/engine/status", async (req, res) => {
     res.json(signalEngine.status());
+  });
+
+  // Forex.game API endpoints
+  app.get("/api/forex/quotes", async (req, res) => {
+    try {
+      const symbols = (req.query.symbols as string)?.split(",") || ["XAUUSD", "EURUSD", "GBPUSD"];
+      const forexGame = getForexGameService();
+      const quotes = await forexGame.getQuotes(symbols);
+      res.json(quotes);
+    } catch (error: any) {
+      console.error('[API /forex/quotes] Error:', error);
+      res.status(500).json({ error: "Failed to fetch quotes", details: error?.message });
+    }
+  });
+
+  app.get("/api/forex/candles", async (req, res) => {
+    try {
+      const { symbol, timeframe = 'H1', count = '200' } = req.query;
+      
+      if (!symbol || !timeframe) {
+        return res.status(400).json({
+          error: "Missing required parameters",
+          details: "symbol and timeframe are required"
+        });
+      }
+
+      const forexGame = getForexGameService();
+      const candles = await forexGame.getCandles(symbol as string, timeframe as string, parseInt(count as string));
+      res.json(candles);
+    } catch (error: any) {
+      console.error('[API /forex/candles] Error:', error);
+      res.status(500).json({ error: "Failed to fetch candles", details: error?.message });
+    }
+  });
+
+  app.get("/api/forex/accounts", async (req, res) => {
+    try {
+      const forexGame = getForexGameService();
+      const accounts = await forexGame.getAccounts();
+      res.json(accounts);
+    } catch (error: any) {
+      console.error('[API /forex/accounts] Error:', error);
+      res.status(500).json({ error: "Failed to fetch accounts", details: error?.message });
+    }
+  });
+
+  app.post("/api/forex/orders", async (req, res) => {
+    try {
+      const orderSchema = z.object({
+        symbol: z.string(),
+        side: z.enum(["buy", "sell"]),
+        type: z.enum(["market", "limit", "stop"]),
+        quantity: z.number().positive(),
+        price: z.number().optional(),
+        stopLoss: z.number().optional(),
+        takeProfit: z.number().optional(),
+      });
+
+      const orderData = orderSchema.parse(req.body);
+      const forexGame = getForexGameService();
+      const result = await forexGame.placeOrder(orderData);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('[API /forex/orders] Error:', error);
+      res.status(400).json({ error: "Failed to place order", details: error?.message });
+    }
+  });
+
+  app.get("/api/forex/orders", async (req, res) => {
+    try {
+      const forexGame = getForexGameService();
+      const orders = await forexGame.getOrders();
+      res.json(orders);
+    } catch (error: any) {
+      console.error('[API /forex/orders] Error:', error);
+      res.status(500).json({ error: "Failed to fetch orders", details: error?.message });
+    }
   });
 
   return httpServer;
